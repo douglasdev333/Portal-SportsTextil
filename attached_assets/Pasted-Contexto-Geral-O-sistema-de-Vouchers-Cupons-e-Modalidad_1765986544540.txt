@@ -1,0 +1,154 @@
+Contexto Geral
+--------------
+O sistema de Vouchers, Cupons e Modalidades do tipo Voucher já está amplamente implementado no backend e no frontend. A documentação oficial do projeto é /docs/MODALIDADE_VOUCHER.md e deve ser tratada como a fonte de verdade.
+
+Após auditoria e testes reais, foi confirmado que:
+
+- Backend:
+  - Validação de voucher retorna corretamente códigos de erro específicos (404 / 409 / 422).
+  - Criação de cupons em massa via endpoint /bulk está implementada.
+  - Exportação de vouchers já foi implementada (não mexer nessa parte).
+
+- Frontend:
+  - Ainda possui lacunas funcionais e problemas de UX.
+  - Está tratando erros de negócio como “erro de conexão”.
+  - Não está expondo corretamente todas as funcionalidades já existentes no backend.
+
+Este prompt é para:
+- Ajustar o frontend,
+- Corrigir o fluxo de validação,
+- Completar telas administrativas,
+- Sem reimplementar ou alterar decisões já consolidadas.
+
+
+========================================
+1) Ajustes na validação de voucher no FRONTEND
+========================================
+
+Situação atual:
+- O backend retorna erros corretamente:
+  - 404, 409, 422
+  - com payload:
+    {
+      success: false,
+      error: { code, message }
+    }
+- Porém o frontend ainda mostra “erro de conexão” nesses casos.
+
+Correções obrigatórias:
+
+1.1 Tratamento correto de status HTTP
+- No frontend, ajustar o handler de validação de voucher para:
+  - Tratar 404 / 409 / 422 como ERROS DE REGRA DE NEGÓCIO.
+  - NÃO tratar esses status como erro de rede.
+
+1.2 Mensagens ao usuário
+- Exibir a mensagem vinda do backend (`error.message`).
+- Bloquear avanço no fluxo sem criar pedido ou inscrição.
+
+1.3 Erros reais de conexão
+- Apenas mostrar “erro de conexão” quando:
+  - timeout,
+  - falha de rede,
+  - erro 5xx sem payload válido.
+
+Esse ajuste é CRÍTICO para o fluxo de inscrição com voucher.
+
+
+========================================
+2) Completar a UI de CRIAÇÃO DE CUPONS EM MASSA
+========================================
+
+O backend já possui o endpoint:
+POST /api/admin/events/:eventId/coupons/bulk
+
+Porém o frontend ainda não reflete corretamente as opções disponíveis.
+
+Implementar/ajustar a tela de criação em massa de cupons para conter:
+
+Campos obrigatórios:
+- Quantidade de cupons (quantity)
+- Tipo de desconto:
+  - valor fixo
+  - porcentagem
+  - 100% (gratuito)
+- Valor do desconto
+- Limite total de usos
+- Limite de uso por usuário
+- Status do cupom (is_active: ativo / inativo)
+
+Campo de código:
+- O campo de código deve ser OPCIONAL.
+- Regras:
+  - Se preenchido → backend usa o código informado.
+  - Se deixado em branco → backend gera códigos aleatórios automaticamente.
+- Para quantity > 1:
+  - NÃO exigir código manual.
+
+UX esperado:
+- Validações claras no frontend (quantity >= 1 etc).
+- Após criação:
+  - mostrar feedback de sucesso,
+  - atualizar listagem de cupons automaticamente,
+  - opcionalmente exibir os códigos gerados.
+
+
+========================================
+3) Ajuste de regras de modalidade VOUCHER gratuita no FRONTEND
+========================================
+
+Regra já corrigida no backend:
+- Modalidade do tipo 'voucher' pode ter valor 0 ou null.
+
+Ajuste necessário no frontend:
+- Garantir que:
+  - modalidades do tipo 'voucher' com valor 0
+  - NÃO apareçam como “indisponível”.
+- Essas modalidades devem:
+  - ser selecionáveis,
+  - permitir avançar para a etapa de inserção do voucher.
+
+A regra antiga de “modalidade sem preço = indisponível” deve:
+- continuar válida para outros tipos,
+- mas NÃO se aplicar a 'voucher'.
+
+
+========================================
+4) UX administrativa – Vouchers e Cupons
+========================================
+
+Ajustar pequenos pontos de UX já existentes:
+
+- Garantir que:
+  - estados de erro retornados pelo backend sejam exibidos corretamente.
+  - mensagens não sejam genéricas.
+- Conferir consistência visual:
+  - formulários de criação simples vs criação em massa.
+- Não alterar rotas nem contratos já existentes.
+
+
+========================================
+5) Documentação
+========================================
+
+Ao final das correções:
+
+- Atualizar /docs/MODALIDADE_VOUCHER.md:
+  - refletindo os ajustes de frontend,
+  - descrevendo corretamente o fluxo de validação,
+  - atualizando checklist de implementação.
+
+A documentação deve refletir exatamente o comportamento atual do sistema.
+
+
+========================================
+Objetivo Final
+========================================
+
+Após este ciclo de ajustes:
+
+- O fluxo de voucher no frontend será estável e claro.
+- Erros de negócio não serão confundidos com erro de conexão.
+- A criação de cupons em massa será totalmente utilizável pela UI.
+- Modalidades voucher gratuitas funcionarão corretamente.
+- Frontend e backend estarão alinhados com a documentação.

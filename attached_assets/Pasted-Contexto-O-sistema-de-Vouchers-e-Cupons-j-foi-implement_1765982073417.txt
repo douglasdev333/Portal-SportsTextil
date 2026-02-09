@@ -1,0 +1,185 @@
+Contexto
+--------
+O sistema de Vouchers e Cupons já foi implementado (backend + frontend) e está funcional, porém após testes práticos foram identificados alguns comportamentos que precisam ser corrigidos ou melhorados.
+
+Este prompt NÃO é para refazer o sistema, mas sim para:
+- corrigir falhas,
+- melhorar UX,
+- ajustar regras de negócio,
+- alinhar com o comportamento esperado.
+
+Todas as correções devem respeitar a documentação /docs/MODALIDADE_VOUCHER.md, atualizando-a quando necessário.
+
+
+========================
+1) Exportação de vouchers
+========================
+
+Situação atual:
+- Existe exportação de vouchers (bom).
+- Porém:
+  - exporta todos os vouchers de forma geral,
+  - vem em CSV separado por vírgula,
+  - não permite exportar apenas um lote específico.
+
+Correções desejadas:
+
+1.1 Exportar por LOTE
+- Adicionar opção clara:
+  - "Exportar todos os vouchers"
+  - "Exportar vouchers deste lote"
+- Quando exportar por lote:
+  - incluir apenas vouchers daquele lote selecionado.
+
+1.2 Formato de exportação
+- Trocar o formato padrão para:
+  - Excel (.xlsx) OU
+  - tabela estruturada (colunas bem definidas)
+- Colunas mínimas:
+  - Código
+  - Lote (nome ou id)
+  - Status (livre / usado / expirado)
+  - Data de início
+  - Data de fim
+  - Usado? (sim/não)
+  - Data de uso
+  - Atleta (se houver)
+
+CSV pode existir como opção secundária, mas não como padrão.
+
+
+========================
+2) Correções na criação de CUPONS em massa
+========================
+
+Problemas atuais:
+- Falta controle fino de limites.
+- Campo de código não é flexível.
+- Não é possível definir status ativo/inativo corretamente.
+
+Correções obrigatórias:
+
+2.1 Campos obrigatórios na criação de cupons em massa
+Adicionar os seguintes campos:
+
+- Limite total de usos do cupom (ex: 50 usos no total)
+- Limite de uso por usuário (ex: 1 uso por CPF/email)
+- Código do cupom:
+  - Se preenchido → usar exatamente aquele código
+  - Se deixado em branco → gerar códigos aleatórios automaticamente
+
+2.2 Geração de códigos
+- Códigos gerados automaticamente devem:
+  - ser aleatórios,
+  - não previsíveis,
+  - respeitar unicidade global (não repetir nem com voucher nem com outro cupom).
+
+2.3 Status do cupom (is_active)
+- Na criação:
+  - permitir escolher se o cupom nasce ativo ou inativo.
+- Na edição:
+  - permitir alterar `is_active` (ativar/desativar cupom existente).
+- Cupons inativos:
+  - não podem ser usados,
+  - devem retornar erro amigável no fluxo de pagamento.
+
+
+========================
+3) Modalidade do tipo VOUCHER com valor zero
+========================
+
+Problema crítico atual:
+- Quando a modalidade é do tipo "voucher" e o valor do lote é 0 ou vazio:
+  - a modalidade aparece como INDISPONÍVEL no fluxo do cliente,
+  - pois existe uma regra de segurança que só permite gratuidade para tipo "gratuito".
+
+Correção de regra de negócio:
+
+- Modalidades do tipo:
+  - `gratuito`
+  - `voucher`
+devem poder ser gratuitas.
+
+Nova regra:
+- Se modality.type === 'voucher':
+  - valor do lote pode ser:
+    - zero
+    - nulo
+  - a modalidade deve ser considerada SELECIONÁVEL.
+- O bloqueio de “modalidade sem preço” deve continuar existindo para outros tipos.
+
+Fluxo esperado:
+- Modalidade voucher + valor 0:
+  - usuário pode selecionar a modalidade,
+  - avança para tela de inserção do código de voucher,
+  - se voucher válido → inscrição gratuita concluída.
+
+
+========================
+4) Correção no validador de voucher no fluxo de inscrição
+========================
+
+Problemas observados:
+- Em alguns casos:
+  - erro de conexão ao validar voucher
+  - voucher válido sendo tratado como inválido
+
+Correções solicitadas:
+
+4.1 Revisar integração frontend ↔ backend
+- Conferir:
+  - endpoint correto (/api/vouchers/validate),
+  - método HTTP,
+  - payload enviado,
+  - headers/autenticação (se houver),
+  - tratamento de erro no frontend.
+
+4.2 Mensagens de erro claras
+- Diferenciar erros:
+  - voucher inexistente
+  - voucher expirado
+  - voucher já utilizado
+  - voucher de outro evento
+  - erro técnico (ex: timeout)
+- Mostrar mensagens amigáveis e específicas.
+
+4.3 Garantir que:
+- Voucher válido:
+  - retorna sucesso,
+  - permite avançar no fluxo.
+- Voucher inválido:
+  - bloqueia avanço,
+  - NÃO gera pedido,
+  - NÃO cria inscrição.
+
+
+========================
+5) Atualização da documentação
+========================
+
+Ao finalizar essas correções:
+
+- Atualizar /docs/MODALIDADE_VOUCHER.md com:
+  - ajustes nas regras de modalidade voucher gratuita,
+  - detalhes da exportação por lote,
+  - novos campos de criação de cupons em massa,
+  - controle de status `is_active`,
+  - correções no fluxo de validação de voucher.
+- Atualizar checklist de:
+  - Implementado
+  - Ajustado
+  - Pendente (se restar algo).
+
+
+========================
+Objetivo final
+========================
+
+Após essas correções:
+
+- Exportação de vouchers será flexível e profissional.
+- Criação de cupons em massa será completa e controlada.
+- Modalidades voucher gratuitas funcionarão corretamente.
+- Validação de voucher será estável e confiável.
+- Admin terá controle total sobre cupons e vouchers.
+- UX do atleta será clara e sem bloqueios indevidos.

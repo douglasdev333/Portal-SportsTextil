@@ -1,0 +1,135 @@
+Contexto
+--------
+Temos um modelo de lote com DUAS colunas relacionadas ao estado:
+
+- `status`: 'future' | 'active' | 'closed'
+- `ativo`: boolean
+
+Hoje o comportamento está errado e inconsistente:
+
+1. Ao ativar um lote pelo admin:
+   - Só está mudando `ativo = true`
+   - Mas NÃO está atualizando `status = 'active'`
+   - Isso quebra toda a lógica que depende de `status`.
+
+2. Ao ativar um lote:
+   - Não estamos garantindo que:
+     - apenas um lote por evento fique com `status = 'active'`
+     - outros lotes ativos do mesmo evento sejam fechados (`status = 'closed'`).
+
+3. O campo `status = 'future'` é usado para virada automática de lote quando outro é fechado.
+   - Porém o admin não tem controle claro disso na tela.
+
+Além disso, decidimos uma regra nova e importante:
+
+🚨 A PARTIR DE AGORA:
+- A coluna `ativo` será usada **APENAS PARA VISIBILIDADE NA ÁREA DO CLIENTE**.
+- Regras de negócio (qual lote é usado na inscrição, qual é o lote atual, etc.) serão definidas **EXCLUSIVAMENTE** pelo campo `status`.
+- No futuro, quando listarmos todos os lotes do evento para o atleta:
+  - apenas os lotes com `ativo = true` aparecerão para o atleta,
+  - lotes com `ativo = false` continuarão existindo no banco, mas NÃO serão exibidos na interface do atleta.
+
+
+1) Definição clara de semântica: `status` x `ativo`
+---------------------------------------------------
+
+Quero que você ajuste o código e a lógica conforme:
+
+- `status` (fonte de verdade de negócio):
+  - 'future'  → lote futuro, ainda não ativo, usado para ativação automática quando o lote atual fecha ou expira.
+  - 'active'  → lote atual, válido para o fluxo de inscrição.
+  - 'closed'  → lote encerrado (por capacidade, expiração ou decisão administrativa), não aceita mais inscrições.
+
+- `ativo` (VISIBILIDADE na área do cliente):
+  - boolean, usado apenas para controlar se o lote será exibido nas telas do atleta/cliente.
+  - Se `ativo = false`, o lote:
+    - ainda pode existir para histórico ou controle interno,
+    - ainda pode ter `status = 'closed'`, 'future' ou até 'active' (se fizermos um caso especial),
+    - mas **não deve aparecer na listagem de lotes para o atleta** quando for implementado esse recurso.
+  - `ativo` NÃO pode ser usado para:
+    - decidir se um lote está apto a receber inscrições,
+    - escolher o lote atual na lógica de inscrição.
+  - Toda lógica de negócio deve ser baseada em `status`, não em `ativo`.
+
+Portanto:
+- Se existir qualquer lógica hoje que use apenas `ativo = true` para considerar um lote "válido":
+  - essa lógica deve ser refeita para considerar principalmente `status`.
+
+
+2) Ao ativar um lote pelo admin
+-------------------------------
+
+Quando o admin clicar em "ativar" um lote no painel:
+
+Regras obrigatórias:
+
+- Para o lote selecionado:
+  - `status` deve ser alterado para `'active'`
+  - `ativo` deve ser setado para `true` (já que ele será usado na área do cliente).
+
+- Para os OUTROS lotes do mesmo evento que estiverem `status = 'active'`:
+  - mudar para `status = 'closed'`
+  - `ativo` pode permanecer como está (decisão visual/admin), mas não podem continuar com status 'active'.
+
+- Garantia:
+  - Nunca pode existir mais de 1 lote com `status = 'active'` para o mesmo evento.
+
+Obs.:
+- Lotes com `status = 'future'` permanecem 'future', exceto se o admin escolher explicitamente ativá-los.
+
+
+3) Comportamento no frontend (tela de edição/listagem de lotes)
+----------------------------------------------------------------
+
+Quero que o admin tenha clareza do que está acontecendo:
+
+- Em cada lote, exibir:
+  - `status` (future / active / closed)
+  - `ativo` (visível para o cliente: sim/não)
+
+Ações possíveis:
+
+a) Botão “Ativar lote”
+   - Seta:
+     - `status = 'active'`
+     - `ativo = true`
+   - Marca todos os outros lotes `active` do evento como `status = 'closed'`.
+
+b) Botão “Fechar lote”
+   - Seta:
+     - `status = 'closed'`
+   - `ativo` pode ou não ser alterado, mas isso é puramente visual.
+
+c) Botão “Marcar como futuro”
+   - Seta:
+     - `status = 'future'`
+   - Essa ação deve ser condicionada às regras de negócio (ex.: se ainda fizer sentido reabrir esse lote como futuro).
+
+d) Toggle de visibilidade (`ativo`):
+   - Uma flag tipo:
+     - “Mostrar este lote na área do atleta?”
+   - Muda APENAS `ativo = true/false`
+   - Não altera `status`
+   - Não interfere na lógica de inscrição.
+   - Assim, no futuro, ao listar lotes de um evento para o atleta:
+     - só serão retornados/exibidos lotes com `ativo = true`.
+
+
+4) Queries de lotes para fluxo de inscrição
+-------------------------------------------
+
+Revisar todas as queries/resolvers que buscam "lote ativo para inscrição".
+
+Requisitos:
+
+- Para uso na inscrição:
+  - Buscar SEMPRE por `status = 'active'`.
+  - `ativo` NÃO deve ser usado como condição obrigatória para a lógica de negócio de inscrição.
+  - Exemplo:
+
+  ```sql
+  SELECT *
+  FROM registration_batches
+  WHERE event_id = :eventId
+    AND status = 'active'
+  LIMIT 1;

@@ -1,0 +1,162 @@
+Contexto
+--------
+Ao tentar deletar um lote (batch) pelo gerenciador de eventos, estou recebendo o seguinte erro do Postgres:
+
+error: update or delete on table "registration_batches" violates foreign key constraint "prices_batch_id_registration_batches_id_fk" on table "prices"
+detail: 'Key (id)=(414fc58f-ff9f-4e9c-858e-8ce7a6941128) is still referenced from table "prices".'
+
+Ou seja: existe uma FK em `prices.batch_id` apontando para `registration_batches.id`, e ao deletar o lote o banco impede a operação.
+
+Além disso:
+
+1. O fluxo de deleção via **tela de criação/edição de evento** está inconsistente:
+   - Eu consigo “remover” o lote visualmente na UI,
+   - mas ao salvar o evento, o lote não é realmente deletado do banco.
+   - Parece que a sincronização entre “lotes enviados no payload” e “lotes existentes no banco” não está tratando exclusões.
+
+2. O erro acima acontece ao tentar deletar lote pelo **gerenciador de eventos** (rota `/api/admin/events/:eventId/batches/:batchId`).
+
+
+Regras de negócio de deleção de lote (importante!)
+--------------------------------------------------
+Quero padronizar o comportamento de deleção de lote com as seguintes regras:
+
+1. **Se um lote tiver inscrições/pedidos vinculados (ex.: tabela registrations)**:
+   - ESTE LOTE NÃO PODE SER DELETADO.
+   - Em vez disso, o lote deve ser apenas fechado/oculto (`status = 'closed'`, `ativo` ajustado se necessário).
+   - O backend deve retornar um erro específico, por exemplo:
+     - código: `BATCH_HAS_REGISTRATIONS`
+     - mensagem: "Este lote possui inscrições vinculadas e não pode ser excluído. Feche ou oculte este lote em vez de apagar."
+
+2. **Se um lote não tiver inscrições, mas tiver preços vinculados em `prices`**:
+   - Essa relação NÃO deve impedir a deleção.
+   - Ao deletar um lote sem inscrições:
+     - Remover primeiro todos os registros de `prices` relacionados a esse lote (`prices.batch_id`),
+     - depois deletar o lote em `registration_batches`.
+
+3. Se existir QUALQUER outra tabela com FK para `registration_batches.id`:
+   - Precisamos tratar de forma similar:
+     - Se for entidade crítica (como inscrição/pedido): bloquear deleção e retornar erro.
+     - Se for entidade “configuracional” (preços, regras auxiliares, etc.): apagar os filhos antes de apagar o lote ou configurar ON DELETE CASCADE, desde que isso não quebre regras de negócio.
+
+
+O que quero que você implemente
+-------------------------------
+
+### 1) Auditar e ajustar TODAS as dependências de `registration_batches`
+
+- Verificar no schema todas as FKs que referenciam `registration_batches.id`, por exemplo:
+  - `prices.batch_id -> registration_batches.id`
+  - `registrations.batch_id -> registration_batches.id`
+  - e qualquer outra que exista.
+
+- Para cada FK:
+  - Se for algo equivalente a `registrations` (ou entidade que representa inscrição/pedido):
+    - **NÃO deletar lote se existirem registros**.
+    - Retornar erro de negócio conforme descrito acima.
+  - Se for algo equivalente a `prices` (configuração, dados auxiliares):
+    - Remover registros filhos antes de remover o lote
+    - OU configurar `ON DELETE CASCADE` no banco *se for seguro* e compatível com o restante da aplicação.
+    - Preferencialmente, fazer a deleção de filhos explicitamente numa transação.
+
+### 2) Ajustar a rota DELETE de batch `/api/admin/events/:eventId/batches/:batchId` (gerenciador de eventos)
+
+Na implementação atual (em `server/routes/admin/batches.ts` e/ou `DbStorage.deleteBatch`):
+
+- A deleção está sendo feita diretamente no `registration_batches` sem tratar `prices` e sem checar `registrations`.
+
+Quero que você:
+
+1. Envolva a deleção de batch em uma **transação**.
+2. Dentro da transação:
+
+   - Verificar se existem registros em `registrations` (ou equivalente) para esse `batch_id`:
+     - Se SIM:
+       - Faz ROLLBACK
+       - Retorna erro `BATCH_HAS_REGISTRATIONS` com a mensagem amigável.
+     - Se NÃO:
+
+       - Apagar, em ordem, os registros auxiliares vinculados (como `prices`):
+         - `DELETE FROM prices WHERE batch_id = :batchId;`
+         - (E quaisquer outras tabelas auxiliares que dependerem desse lote e puderem ser apagadas.)
+
+       - Só então executar:
+         - `DELETE FROM registration_batches WHERE id = :batchId;`
+
+3. Capturar o erro de FK (código `23503`) e transformá-lo em erro de negócio legível, caso alguma relação não tratada apareça, para facilitar debug.
+
+### 3) Corrigir deleção de lote na TELA DE CRIAÇÃO/EDIÇÃO DE EVENTO
+
+Hoje, quando removo um lote na interface de **criação/edição de evento**:
+
+- Ele some visualmente, mas ao salvar o evento:
+  - o lote continua existindo no banco.
+  - Ou seja, o backend não está processando o “delete” que a UI está sugerindo.
+
+Quero que você:
+
+1. Revise o payload enviado pela tela de criação/edição de evento.
+   - Provavelmente é algo como:
+     - `event: { ..., batches: [ ... ] }`
+   - Lotes removidos na UI provavelmente simplesmente deixam de aparecer nessa lista.
+
+2. Ajuste a lógica de persistência no backend para:
+
+   - A partir da lista de lotes enviada pela tela:
+     - Identificar:
+       - Lotes novos (sem id) → criar
+       - Lotes existentes → atualizar
+       - Lotes que existem no banco mas **não estão mais na lista enviada** → tratar como pedidos de deleção
+
+   - Para cada lote "faltando" (excluído na UI):
+     - Tentar deletar esse lote usando a MESMA lógica de deleção segura descrita acima:
+       - Se tiver inscrições → bloquear e retornar erro `BATCH_HAS_REGISTRATIONS`
+       - Se não tiver inscrições → apagar filhos (prices etc.) e depois o lote.
+
+3. Garantir que:
+   - Ao salvar as alterações do evento:
+     - os lotes removidos na UI realmente sumam do banco (quando permitido),
+     - e as mesmas regras de segurança de deleção são aplicadas tanto pela tela do gerenciador quanto pela tela de criação/edição de evento.
+
+### 4) Tratar o feedback de erro na UI
+
+- Quando o backend retornar `BATCH_HAS_REGISTRATIONS`:
+  - Na interface (gerenciador de eventos e tela de criação/edição de evento), exibir mensagem amigável:
+    - "Este lote já possui inscrições vinculadas e não pode ser excluído. Feche ou oculte o lote em vez de apagá-lo."
+  - Não remover o lote da tela (se já tinha sumido visualmente, recarregar estado atualizado).
+
+### 5) Testes necessários
+
+Criar/ajustar testes (unitários e/ou de integração) para:
+
+1. Deleção de lote sem filhos:
+   - Lote sem inscrições e sem preços:
+     - Deve ser deletado normalmente.
+
+2. Deleção de lote com preços e sem inscrições:
+   - Deve:
+     - Remover `prices` relacionados
+     - Depois remover o lote
+     - Não gerar erro 23503.
+
+3. Deleção de lote com inscrições:
+   - Deve:
+     - Não deletar o lote
+     - Não deletar preços
+     - Retornar erro `BATCH_HAS_REGISTRATIONS`.
+
+4. Tela de criação/edição de evento:
+   - Remover um lote na UI e salvar:
+     - Se o lote não tiver inscrições → ele some do banco.
+     - Se tiver inscrições → a UI recebe erro e exibe mensagem, não “perde” o lote.
+
+
+Objetivo final
+--------------
+Depois dessas alterações:
+
+- A deleção de lote no gerenciador de eventos não estoura mais erro de FK.
+- Lotes com inscrições não podem ser apagados (apenas fechados/ocultos).
+- Lotes sem inscrições podem ser deletados junto com seus dados auxiliares (como preços).
+- A tela de criação/edição de evento realmente reflete deletar/alterar lotes no banco.
+- O comportamento de deleção de lote é consistente e seguro em toda a aplicação.

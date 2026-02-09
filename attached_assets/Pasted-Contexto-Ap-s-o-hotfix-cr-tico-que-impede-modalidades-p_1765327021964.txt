@@ -1,0 +1,121 @@
+Contexto
+--------
+Após o hotfix crítico (que impede modalidades pagas virarem gratuitas por erro de lote), preciso melhorar a arquitetura do fluxo de verificação de lotes e do status global do evento.
+
+Hoje:
+- Quando um lote expira por data ou enche por vagas, o comportamento às vezes é inconsistente:
+  - não ativa o próximo lote
+  - não bloqueia inscrições corretamente
+- O evento não possui um status global "esgotado"
+  - e isso permitir que o fluxo de inscrição tente seguir mesmo quando na prática não há mais vagas/lotes.
+
+
+Objetivos desta melhoria
+------------------------
+1. Implementar uma rotina robusta de validação automática de lotes, em dois momentos:
+   - (a) Quando o cliente acessa a tela do evento/modalidades
+   - (b) Antes de iniciar a transação de inscrição
+
+2. Adicionar um campo de status no evento, por exemplo:
+   - `status = 'active' | 'sold_out' | 'draft' | 'closed'`
+   - O valor 'sold_out' (esgotado) deve:
+     - bloquear o fluxo de inscrição no backend
+     - deixar todas as modalidades visívelmente como esgotadas no frontend
+
+3. Amarrar a lógica de esgotamento global:
+   - Quando a capacidade global do evento for atingida
+   - Ou quando não houver mais nenhum lote válido para nenhuma modalidade (se for o caso)
+   → o evento deve ser marcado como `sold_out` / `esgotado`
+
+
+Parte 1 – Verificação automática de lotes
+-----------------------------------------
+Quero uma função central, clara, reutilizável, algo como:
+
+- `recalculateBatchesForEvent(eventId)`
+- ou `ensureValidActiveBatch(eventId)`
+
+Requisitos:
+
+1. Deve:
+   - Verificar o lote ativo atual:
+     - Se o lote ativo:
+       - expirou por data/hora (considerando timezone São Paulo)
+       - OU atingiu limite de vagas (já lotou)
+     - Então:
+       - marcar esse lote como `closed`
+       - procurar o próximo lote `future` com maior `order_index`
+       - ativar esse próximo lote (status 'active')
+
+2. Se NÃO houver próximo lote:
+   - significa que não há mais lote válido para aquele evento (ou modalidade)
+   - deve:
+     - marcar que não há lote ativo
+     - impedir novas inscrições nessa modalidade/evento
+     - potencialmente marcar o evento como `sold_out` (caso seja a última modalidade relevante).
+
+3. IMPORTANTE:
+   - Essa função deve ser chamada em:
+     - a) carregamento da tela do evento no frontend (rota de GET de detalhes do evento)
+     - b) início do fluxo de inscrição no backend (antes de travar a transação de inscrição).
+
+
+Parte 2 – Status "esgotado" no evento
+-------------------------------------
+Adicionar campo `status` na tabela de eventos (se ainda não existir):
+
+- valores possíveis:
+  - 'draft'   → rascunho, ainda não liberado
+  - 'active'  → inscrições abertas
+  - 'sold_out' → esgotado globalmente
+  - 'closed'  → finalizado, inscrições encerradas manualmente
+
+Regras:
+
+1. Quando a capacidade global do evento (`capacity`) for atingida:
+   - atualizar `status` para 'sold_out'
+   - impedir qualquer nova inscrição
+   - backend deve checar isso primeiro:
+     - se `event.status = 'sold_out'`, retorna erro tipo `EVENT_SOLD_OUT`
+   - frontend deve:
+     - exibir o evento como esgotado
+     - todas as modalidades devem aparecer como "esgotado"
+     - botão de inscrição desativado
+
+2. A função de recalcular lotes também pode marcar evento como `sold_out` se:
+   - não houver mais nenhum lote ativo/futuro, dependendo da regra de negócio.
+
+
+Parte 3 – Comportamento da tela de modalidades
+----------------------------------------------
+Na tela do evento/modalidades (frontend):
+
+1. Ao carregar:
+   - Backend deve executar a verificação automática (recalculate/ensure batches).
+   - A resposta da API deve trazer:
+     - status do evento
+     - informação de quais modalidades estão:
+       - abertas (há lote ativo disponível e vagas)
+       - esgotadas (sem lote válido / sem vagas)
+   - Se `event.status = 'sold_out'`:
+     - TODAS as modalidades devem ser marcadas como esgotadas
+     - botões de inscrição desativados.
+
+2. Se durante o fluxo o evento mudar para sold_out:
+   - No momento em que o usuário tentar iniciar a inscrição:
+     - Backend deve checar novamente o status do evento:
+       - Se `sold_out` → bloquear e informar mensagem amigável:
+         "Inscrições encerradas - evento esgotado."
+
+
+Timezone (Brasil/São Paulo)
+---------------------------
+Quando for verificar expiração de lote por data/hora:
+
+- a data salva no banco está em UTC (3h à frente)
+- as comparações de validade devem ser feitas considerando o timezone 'America/Sao_Paulo'
+
+Exemplo em Postgres:
+
+```sql
+(CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')

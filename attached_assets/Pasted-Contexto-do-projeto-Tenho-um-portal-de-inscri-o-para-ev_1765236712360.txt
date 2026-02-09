@@ -1,0 +1,175 @@
+Contexto do projeto
+-------------------
+- Tenho um portal de inscrição para eventos de corrida.
+- Stack: Node.js no backend + Postgres gerenciado pelo Supabase.
+- Já existe:
+  - Sistema de login e identificação de usuário/atleta.
+  - Rotas de inscrição funcionando (criam registros no banco, etc.).
+- Preciso adicionar uma camada robusta de CONTROLE DE VAGAS para eventos COM LIMITE de inscritos.
+- Cenário típico:
+  - Evento gratuito com 1000 vagas.
+  - As vagas acabam em menos de 3 minutos.
+  - Muitas requisições simultâneas (explosão de acessos).
+- Não quero usar Redis por enquanto. Quero resolver usando **apenas Postgres + Node** com transação atômica.
+
+Objetivo
+--------
+Quero que você:
+1. Modele (ou ajuste) o banco para suportar controle de vagas por evento.
+2. Implemente, no backend Node, um fluxo de inscrição que:
+   - Seja **atômico** (duas pessoas não podem “pegar” a mesma vaga).
+   - **Nunca ultrapasse** a capacidade (`capacity`) do evento, mesmo sob alta concorrência.
+3. Implemente testes (unitários e/ou de carga simulada) para validar o comportamento concorrente.
+4. Mantenha o endpoint de inscrição o mais enxuto possível (sem tarefas pesadas dentro da transação).
+
+Restrições/decisões
+-------------------
+- Não usar Redis por enquanto.
+- A trava deve ser feita direto no Postgres, usando transações.
+- Não confiar em verificações apenas no front-end (front é só cosmético).
+- E-mails, PDFs, etc. NÃO devem rodar dentro da mesma transação crítica de reserva de vaga.
+- Se possível, evitar mudanças drásticas na API existente; integrar essa lógica da forma mais limpa.
+
+Modelo de dados desejado
+------------------------
+Se necessário, ajuste/adicione as tabelas abaixo:
+
+Tabela "events":
+- id (primary key)
+- name (text)
+- capacity (int)          -- capacidade máxima, ex: 1000
+- taken_count (int)       -- quantas vagas já foram consumidas
+- ... outros campos do evento (datas, locais etc.)
+
+Tabela "registrations":
+- id (primary key)
+- event_id (fk -> events.id)
+- user_id (ou cpf/email, qualquer identificador único do participante)
+- status (ex: "confirmed", "cancelled")
+- created_at (timestamp)
+- ... quaisquer outros campos já existentes
+
+Regras de integridade importantes:
+- Deve existir uma UNIQUE CONSTRAINT garantindo que o mesmo usuário não pode se inscrever duas vezes no mesmo evento. Exemplo:
+  - UNIQUE (event_id, user_id) 
+  - ou UNIQUE (event_id, cpf), dependendo do campo usado.
+- O número de registros "válidos" (status = 'confirmed') para um evento nunca pode passar de `events.capacity`.
+
+Lógica de inscrição que quero
+-----------------------------
+Quero que você implemente a lógica de inscrição de forma atômica, idealmente assim:
+
+1. Ao receber uma requisição de inscrição para `event_id`:
+   - Identificar o usuário (via user_id, cpf, email, tanto faz, mas seja consistente com o sistema atual).
+
+2. Abrir uma transação no Postgres (BEGIN).
+
+3. Dentro da transação:
+   a) Buscar a linha do evento com **lock de linha**:
+      - `SELECT capacity, taken_count FROM events WHERE id = :event_id FOR UPDATE;`
+      - Isso deve travar somente aquela linha, não o banco todo.
+
+   b) Verificar:
+      - Se `taken_count >= capacity`, então:
+        - ROLLBACK
+        - Retornar um erro controlado para o cliente: inscrições esgotadas.
+
+   c) Garantir que o usuário ainda NÃO tem inscrição confirmada naquele evento:
+      - Exemplo: SELECT na tabela registrations dentro da transação
+        ou confiar no UNIQUE (event_id, user_id) e tratar o erro se violar.
+
+   d) Criar a inscrição:
+      - Inserir em `registrations` com status 'confirmed' (já que o evento é gratuito) ou outro status que fizer sentido.
+      - Exemplo: `INSERT INTO registrations (...) VALUES (...);`
+
+   e) Atualizar o contador de vagas consumidas:
+      - `UPDATE events SET taken_count = taken_count + 1 WHERE id = :event_id;`
+
+4. Dar `COMMIT` na transação.
+
+5. Retornar para o cliente uma resposta clara:
+   - Sucesso: dados da inscrição.
+   - Falha: mensagem de "inscrições esgotadas" ou "usuário já inscrito".
+
+Sugestão de implementação em Supabase/Postgres
+----------------------------------------------
+Quero que você avalie e escolha uma das abordagens (explique a que usar):
+
+(A) **Função RPC no Postgres**:
+   - Criar uma função SQL ou PL/pgSQL (por exemplo: `register_for_event(event_id, user_id)`) que implemente toda a lógica acima.
+   - Expor essa função via RPC do Supabase.
+   - No Node, eu só chamaria essa função passando `event_id` e `user_id` e tratar o resultado.
+
+(B) **Transação pela camada Node**:
+   - Usar o client do Supabase (ou outro client Postgres) para:
+     - Iniciar transação.
+     - Rodar SELECT ... FOR UPDATE.
+     - Inserir na registrations.
+     - Atualizar events.taken_count.
+     - Commit.
+   - Certifique-se de mostrar como fazer isso de forma correta com o client específico que estou usando (se precisar, pergunte sobre o client ou assuma o supabase-js/pg e deixe claro).
+
+Pode escolher a abordagem mais simples/robusta para implementar agora, mas explique o raciocínio.
+
+Tratamento de erros e concorrência
+----------------------------------
+- Se a UNIQUE CONSTRAINT (event_id, user_id) for violada (usuário tentou se inscrever de novo):
+  - Devolver um erro amigável avisando que ele já está inscrito.
+- Se a transação detectar que `taken_count >= capacity`, retornar "vagas esgotadas".
+- Certificar que, por causa do `FOR UPDATE`, não há condição de corrida que permita passar o total de `capacity`.
+- Importante: não deixar a transação segurando o lock por muito tempo. Dentro da transação:
+  - Faça somente:
+    - SELECT FOR UPDATE
+    - INSERT de registration
+    - UPDATE de events
+  - Nada de operações externas, chamadas HTTP, envio de e-mail, etc.
+
+Testes que quero que você crie
+------------------------------
+Quero que você crie testes automatizados cobrindo esses cenários (pode usar Jest, Vitest ou outra lib, mas seja consistente):
+
+1. **Inscrição simples com vagas sobrando**
+   - Criar evento com capacity = 1000, taken_count = 0.
+   - Fazer uma inscrição.
+   - Verificar:
+     - registration criada.
+     - taken_count atualizado para 1.
+
+2. **Esgotamento exato**
+   - Evento com capacity = 2, taken_count = 0.
+   - Rodar 2 inscrições diferentes.
+   - Ambas devem ser confirmadas.
+   - taken_count = 2.
+
+3. **Tentativa após esgotado**
+   - Com o mesmo evento (capacity 2, taken_count 2),
+   - Nova tentativa de inscrição deve retornar "esgotado" e não criar registration.
+
+4. **Concorrência (simulada)**
+   - Simular várias requisições concorrentes (por exemplo, 50 ou 100 chamadas assíncronas) tentando se inscrever no mesmo evento com capacity menor (ex: 10).
+   - Ao final:
+     - Deve haver no máximo 10 registrations confirmed.
+     - taken_count deve ser 10.
+     - Nenhum erro de violação de integridade inconsistente.
+
+5. **Usuário duplicado**
+   - Mesmo usuário tentando se inscrever 2 vezes no mesmo evento.
+   - Verificar que só há 1 registration para ele.
+   - O sistema retorna erro amigável ou simplesmente indica que já está inscrito.
+
+Performace e boas práticas
+--------------------------
+- Deixe bem claro no código e nos comentários:
+  - Qual parte é crítica (a transação com FOR UPDATE).
+  - Que a transação deve ser a mais curta possível.
+- Se fizer sentido, configurar ou explicar o uso de pool de conexões para o Postgres, mas não complicar demais agora.
+- Não adicionar funcionalidades pesadas dentro do endpoint de inscrição; se quiser, deixe comentado onde eu posso adicionar fila de e-mail depois.
+
+O que espero como resposta
+--------------------------
+- Código exemplo completo:
+  - Migrações ou scripts SQL (ALTER TABLE / CREATE TABLE / CREATE FUNCTION, etc.).
+  - Código Node.js da rota/handler de inscrição usando essa lógica.
+  - Testes automatizados cobrindo os cenários descritos.
+- Comentários explicando os pontos críticos: FOR UPDATE, transação, UNIQUE, etc.
+- Se possível, sugestões de melhoria futura (ex.: uso de Redis, fila de jobs), mas o foco principal é fazer a solução funcionar somente com Node + Postgres/Supabase.

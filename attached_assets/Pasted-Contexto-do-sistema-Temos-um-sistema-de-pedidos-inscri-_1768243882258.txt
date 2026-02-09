@@ -1,0 +1,94 @@
+Contexto do sistema
+Temos um sistema de pedidos/inscrições que permite ao usuário escolher a forma de pagamento. Uma das opções é PIX, que gera um código de pagamento com tempo padrão de validade de 30 minutos.
+
+Existe também um tempo limite do pedido/inscrição, após o qual o sistema cancela automaticamente o pedido caso não haja pagamento confirmado.
+
+Problema identificado
+
+Regeneração indevida do PIX
+
+Na tela de pedido, o usuário pode clicar em “Trocar forma de pagamento”.
+
+Se o usuário seleciona PIX, depois troca para outra forma e volta novamente para PIX:
+
+Um novo código PIX é gerado, em vez de reutilizar o código original.
+
+Esse problema já havia sido corrigido anteriormente, mas voltou a acontecer nos testes atuais.
+
+Inconsistência entre tempo do pedido e tempo do PIX
+
+O tempo de expiração do pedido começa a contar antes da escolha da forma de pagamento.
+
+Exemplo de cenário problemático:
+
+Usuário chega à tela de pagamento.
+
+Fica 15 minutos sem escolher a forma de pagamento.
+
+Depois escolhe PIX (que tem 30 minutos para pagamento).
+
+Após mais 15 minutos, o sistema cancela o pedido por tempo expirado.
+
+O PIX ainda está ativo e pode ser pago.
+
+Se o cliente pagar após o cancelamento, ocorre inconsistência no sistema (pedido cancelado + pagamento recebido).
+
+Objetivos da correção
+
+Reutilização do PIX
+
+Se um pagamento PIX já foi gerado para o pedido:
+
+Ao trocar a forma de pagamento e voltar para PIX:
+
+Não gerar um novo código PIX
+
+Reutilizar:
+
+O mesmo código PIX
+
+O mesmo identificador de pagamento
+
+O mesmo tempo restante de expiração
+
+Sincronização do tempo do pedido com o tempo do PIX
+
+Quando a forma de pagamento escolhida for PIX:
+
+O tempo de expiração/cancelamento do pedido deve:
+
+Ser automaticamente ajustado para 30 minutos
+
+Contados a partir do momento da criação do pagamento PIX
+
+O tempo padrão do pedido (antes da escolha de pagamento) não deve causar cancelamento enquanto o PIX estiver válido.
+
+Regras de negócio esperadas
+
+Um pedido não pode ser cancelado enquanto existir:
+
+Um pagamento PIX válido e ativo associado a ele.
+
+O sistema deve ter uma única fonte de verdade para:
+
+Código PIX
+
+Horário de criação do PIX
+
+Horário de expiração do pedido quando PIX estiver ativo
+
+Trocas de forma de pagamento não devem reiniciar timers nem gerar novos PIX, exceto se:
+
+O PIX anterior já estiver expirado ou explicitamente invalidado.
+
+Critérios de aceitação
+
+✅ Trocar a forma de pagamento e voltar para PIX mantém o mesmo código.
+
+✅ O tempo de expiração do pedido passa a coincidir com o tempo do PIX.
+
+✅ Não é possível pagar um PIX válido para um pedido já cancelado.
+
+✅ Não ocorre inconsistência entre status do pedido e status do pagamento.
+
+✅ O comportamento é idempotente (repetir a ação não gera efeitos colaterais).

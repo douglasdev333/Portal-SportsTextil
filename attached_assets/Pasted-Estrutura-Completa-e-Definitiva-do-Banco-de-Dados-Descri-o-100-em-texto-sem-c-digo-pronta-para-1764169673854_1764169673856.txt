@@ -1,0 +1,114 @@
+Estrutura Completa e Definitiva do Banco de Dados
+(Descrição 100% em texto, sem código – pronta para documentação ou repasse ao time)
+1. Organizadores
+
+Cada organizador (empresa ou pessoa física) pode criar vários eventos.
+Dados: ID único, nome, CNPJ/CPF, e-mail, telefone, data de cadastro.
+
+2. Eventos (a corrida propriamente dita)
+Contém todas as informações gerais do evento.
+Um evento pertence a apenas um organizador e pode ter várias modalidades.
+Campos principais:
+
+ID único
+Slug (URL amigável: corrida-da-lua-2026)
+Nome do evento
+Descrição completa (texto rico)
+Data do evento
+Endereço completo + cidade + estado
+Banner/capa
+Data/hora de abertura das inscrições
+Data/hora de encerramento das inscrições
+Status: Rascunho | Publicado | Cancelado | Finalizado
+Flag: entrega camisa no kit? (Sim/Não)
+Flag avançada (oculta por padrão): usar grade de camisas separada por modalidade? (quase nunca usada)
+
+3. Modalidades
+Cada evento tem uma ou várias modalidades (5km, 10km, 21km, Kids, Caminhada, PCD etc.).
+Campos de cada modalidade:
+
+Nome (ex: “Meia Maratona”, “Kids 200m”)
+Distância (em km ou metros)
+Horário exato da largada
+Descrição específica da modalidade
+Imagem da modalidade (opcional)
+Mapa do percurso (imagem OU link GPX/Strava)
+Limite total de vagas nesta modalidade (obrigatório, pode ser “ilimitado”)
+Tipo de acesso:
+→ Gratuita
+→ Paga
+→ Exige código/voucher
+→ Exclusiva PCD
+→ Exige aprovação manual do organizador
+
+4. Grade de Camisas – REGRA PADRÃO (95%+ dos casos)
+Uma única grade de camisas válida para TODO o evento (independente da modalidade):
+
+Pertence ao evento (não à modalidade)
+Tamanhos e quantidades totais:
+PP → 100 unid. | P → 400 | M → 700 | G → 650 | GG → 350 | 3G → 150 etc.
+Quando o atleta se inscreve, escolhe o tamanho e o sistema desconta 1 unidade do estoque geral.
+Quando um tamanho acaba → fica indisponível para todas as modalidades.
+Relatório final mostra exatamente quantas camisas de cada tamanho foram usadas.
+
+5. Grade de Camisas – REGRA EXCEPCIONAL (casos raros)
+Só é usada quando o organizador ativa explicitamente a opção avançada “Usar grade separada por modalidade”.
+Exemplos de uso real:
+
+Prova com kit infantil + kit adulto
+Camiseta baby look feminina separada
+Evento com modalidades elite que ganham camisa diferente
+
+Nesse caso cada modalidade tem sua própria grade de tamanhos e estoque independente.
+6. Lotes de Inscrição
+Cada evento tem quantos lotes o organizador quiser (promocional, 1º lote, 2º lote, lote final etc.).
+Campos de cada lote:
+
+Nome (ex: “Lote Promocional”)
+Data/hora de início
+Data/hora de término OU quantidade máxima de inscrições neste lote
+O sistema troca automaticamente para o próximo lote quando:
+→ a data de término chega OU
+→ a quantidade máxima de inscrições neste lote é atingida
+
+7. Preços
+O preço é definido pela combinação Modalidade + Lote.
+Exemplo real:
+
+Lote5km10km21kmKidsLote PromocionalR$ 69R$ 89R$ 129Grátis1º LoteR$ 89R$ 109R$ 149R$ 302º LoteR$ 109R$ 129R$ 179R$ 40
+8. Arquivos Anexos do Evento
+O organizador pode subir quantos arquivos quiser.
+Cada arquivo contém:
+
+Nome exibido (ex: “Regulamento Oficial 2026”)
+Link/arquivo
+Flag: obrigatório aceitar para se inscrever? (quase sempre sim para o regulamento)
+
+9. Inscrições
+Registro de cada atleta inscrito.
+Contém:
+
+Evento
+Modalidade escolhida
+Lote em que foi feita a inscrição
+Tamanho de camisa escolhido (se o evento entrega camisa)
+Valor pago
+Se usou voucher/código
+Status: pendente | confirmada | cancelada | no-show
+Data/hora do pagamento
+ID do pagamento no gateway (Mercado Pago, Asaas, PagSeguro etc.)
+
+10. Aceite de Documentos
+Para cada inscrição, registra exatamente quais arquivos obrigatórios o atleta aceitou e em que momento.
+Relacionamentos finais (resumo simples)
+
+1 Organizador → vários Eventos
+1 Evento → várias Modalidades
+1 Evento → 1 Grade de camisas global (padrão) OU várias grades por modalidade (exceção)
+1 Evento → vários Lotes
+1 Modalidade + 1 Lote → 1 preço específico
+1 Evento → vários Arquivos anexos
+1 Evento + 1 Modalidade + 1 Lote → várias Inscrições
+1 Inscrição → vários Aceites de documentos
+
+Essa é a estrutura definitiva que atende 100% dos requisitos que você levantou, é exatamente como os maiores sistemas de corrida do Brasil funcionam hoje e evita todos os problemas clássicos de controle de estoque de camisas e lotes.

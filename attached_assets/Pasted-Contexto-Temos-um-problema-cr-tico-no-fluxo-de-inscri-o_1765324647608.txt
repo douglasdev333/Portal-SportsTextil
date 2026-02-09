@@ -1,0 +1,120 @@
+Contexto
+--------
+Temos um problema crítico no fluxo de inscrição:
+
+- Quando há algum problema com o lote (ex.: lote expirado por data, lote inválido, lote não encontrado etc.),
+- O sistema passa a exibir a modalidade como se fosse gratuita (valor R$ 0,00),
+- Isso NÃO PODE acontecer em hipótese alguma, em nenhuma modalidade que seja do tipo "paga" ou qualquer tipo não gratuito.
+
+Isso é um bug grave de negócio e precisa ser corrigido com prioridade máxima.
+
+
+Comportamento desejado (regra de ouro)
+--------------------------------------
+1. Em NENHUM cenário um problema de lote pode resultar em:
+   - preço zerado
+   - modalidade "virar gratuita"
+   - inscrição seguir sem preço definido
+
+2. Se não houver um lote válido para aquela modalidade/evento (por data ou por vagas):
+   - a inscrição deve ser BLOQUEADA
+   - nunca deve “cair em fallback” de valor 0
+
+3. A definição de preço deve ser SEMPRE:
+   - baseada no lote ativo válido
+   - ou baseada numa regra clara de modalidade (apenas quando tipo dela for explicitamente GRATUITA)
+
+4. Se a modalidade for do tipo paga (ex.: "paid", "paga", "premium", etc.):
+   - é PROIBIDO prosseguir com preço 0
+   - se não houver lote válido → erro de negócio, NÃO fallback para free
+
+
+O que corrigir imediatamente
+----------------------------
+Quero que você revise e corrija todos os pontos abaixo:
+
+1. Trechos de código onde:
+   - se o lote não é encontrado
+   - ou se a consulta de lote retorna null/undefined
+   - ou se o lote está expirado
+   - ou se deu erro na lógica de lote
+
+   e, por causa disso, o sistema está:
+
+   - zerando o valor (`price_cents = 0`, `total = 0`, etc.)
+   - marcando a modalidade como gratuita de forma indevida
+   - permitindo fluxo de inscrição com valor indefinido ou nulo
+
+2. Em vez de zero, nesses casos, deve ser disparado um erro de negócio, por exemplo:
+
+   - `NO_VALID_BATCH_FOR_PAID_MODALITY`
+   - mensagem: "Nenhum lote válido disponível para esta modalidade no momento."
+
+3. Em TODA lógica de cálculo de preço / resumo de inscrição:
+
+   - Verificar o tipo da modalidade:
+     - Se tipo ≠ "gratuita", "free", etc.:
+       - É OBRIGATÓRIO ter um lote válido com preço
+       - Se não houver lote → ERRO, não seguir com inscrição e NÃO setar preço = 0
+
+4. Revisar o backend (serviço de inscrição / registration-service) para:
+
+   - Garantir que:
+     - a inscrição só é criada quando:
+       - evento válido
+       - modalidade válida
+       - lote válido
+       - preço definido e coerente com o tipo da modalidade
+   - Se qualquer um desses elementos estiver inválido:
+     - a transação deve ROLLBACK
+     - retornar código de erro apropriado
+     - NUNCA criar inscrição “gratuita” por engano
+
+
+Invariantes (o que nunca pode ser violado)
+------------------------------------------
+Defina e implemente invariantes explícitas no código:
+
+- Se `modality.type` for "paid" (ou equivalente):
+  - `batch` não pode ser null
+  - `batch.price_cents` não pode ser 0
+  - `batch.status` deve ser 'active'
+  - lote não pode estar expirado por data ou capacidade
+
+- Se qualquer uma dessas condições falhar:
+  → retornar erro e NÃO continuar com fluxo de inscrição.
+
+
+Testes necessários (hotfix)
+---------------------------
+Criar testes automatizados cobrindo:
+
+1. Modalidade paga, lote expirado:
+   - Esperado: ERRO `NO_VALID_BATCH_FOR_PAID_MODALITY`
+   - Não criar inscrição, não zerar preço
+
+2. Modalidade paga, lote não encontrado:
+   - Esperado: mesmo erro
+   - Não criar inscrição, não zerar preço
+
+3. Bug anterior:
+   - Simular situação em que antes ficava “R$ 0,00”
+   - Garantir que agora:
+     - não há nenhum caminho de execução que zere o valor de forma indevida
+     - o teste falha se algum fallback para zero for tentado
+
+4. Modalidade gratuita:
+   - Se modalidade for realmente gratuita por definição (tipo "free"):
+     - Aí sim, R$ 0,00 é permitido
+     - Mas isso deve vir do tipo da modalidade, não de erro de lote.
+
+
+Objetivo final deste HOTFIX
+---------------------------
+Depois desse ajuste:
+
+- Qualquer problema de lote em modalidade paga:
+  - BLOQUEIA a inscrição
+  - NÃO transforma a modalidade em gratuita
+  - NÃO exibe valor 0
+- Modalidades pagas só seguem com lote válido e preço correto.

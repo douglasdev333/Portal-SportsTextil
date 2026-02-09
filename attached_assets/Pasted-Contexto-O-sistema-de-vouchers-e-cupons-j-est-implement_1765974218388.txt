@@ -1,0 +1,138 @@
+Contexto
+--------
+O sistema de vouchers e cupons já está implementado e funcional (backend + frontend), porém após testes reais foram identificadas melhorias importantes de UX, validação e gestão.
+
+Implemente os ajustes abaixo, mantendo compatibilidade total com o que já existe e atualizando a documentação MODALIDADE_VOUCHER.md ao final.
+
+
+### 1) Validação de voucher já na tela de MODALIDADE (antes do fluxo de inscrição)
+
+Hoje o voucher é validado apenas em etapas posteriores.
+
+Quero que:
+- Na tela de seleção da modalidade:
+  - Se a modalidade for do tipo "voucher":
+    - exista validação imediata do código informado.
+- Essa validação deve:
+  - verificar se o voucher existe,
+  - pertence ao evento,
+  - está dentro da validade,
+  - não foi usado,
+  - não excedeu limite de uso.
+- Em caso de erro:
+  - mostrar mensagem amigável e clara,
+  - impedir o avanço no fluxo.
+- Isso deve acontecer ANTES da criação do pedido ou inscrição.
+
+
+### 2) Auditoria completa do uso do voucher (visual no admin)
+
+Já existe a tabela `voucher_usages`.
+
+Quero expor isso na interface administrativa:
+
+- Para cada voucher:
+  - mostrar:
+    - se foi usado ou não,
+    - data e hora do uso,
+    - atleta que utilizou,
+    - inscrição associada.
+- A tela de voucher deve permitir:
+  - clicar em um voucher
+  - ver seus detalhes de uso (se houver).
+
+
+### 3) Alterar validade de um LOTE de vouchers em massa
+
+Nova funcionalidade:
+
+- No gerenciamento de lote de vouchers:
+  - permitir alterar:
+    - data de início
+    - data de fim
+- Essa alteração deve:
+  - atualizar TODOS os vouchers pertencentes ao lote.
+- Confirmar ação com modal:
+  - “Essa alteração afetará X vouchers. Deseja continuar?”
+
+
+### 4) Exportar vouchers de um lote para Excel
+
+Adicionar opção no admin:
+
+- Botão “Exportar lote”
+- Gera arquivo Excel (.xlsx ou .csv) contendo:
+  - código do voucher
+  - status (livre/usado/expirado)
+  - data de validade
+  - data de uso (se houver)
+  - atleta (se houver)
+- Deve permitir exportar:
+  - um lote específico
+  - vouchers avulsos (separadamente)
+
+
+### 5) Filtros, paginação e busca na tela de vouchers
+
+A tela de vouchers deve suportar:
+
+- Paginação (especialmente para lotes grandes)
+- Filtros:
+  - por lote (Lote 1, Lote 2, Avulsos)
+  - por status (livre / usado / expirado)
+- Busca:
+  - por código do voucher (input de pesquisa)
+
+Tudo isso deve funcionar sem carregar todos os vouchers de uma vez.
+
+
+### 6) Criação de CUPONS em massa (similar aos vouchers)
+
+Hoje cupons só podem ser criados individualmente.
+
+Implementar:
+- Criação em massa de cupons:
+  - quantidade (ex: 5, 10, 100)
+  - tipo de desconto:
+    - valor fixo
+    - porcentagem
+    - 100% (gratuito)
+  - limite de uso por cupom
+  - validade
+- Cada cupom gerado deve:
+  - ter código aleatório
+  - não previsível
+  - compartilhar a mesma configuração
+
+
+### 7) Regra CRÍTICA de unicidade global de códigos
+
+Regra obrigatória:
+
+- Nenhum código pode se repetir no banco:
+  - nem entre vouchers,
+  - nem entre cupons.
+- Implementar:
+  - constraint UNIQUE global (ou estratégia equivalente)
+  - validação no código para retry automático na geração
+- Em caso de colisão:
+  - gerar novo código
+  - nunca permitir salvar duplicado.
+
+
+### 8) Atualização da documentação
+
+Ao final:
+- Atualizar /docs/MODALIDADE_VOUCHER.md com:
+  - novas funcionalidades implementadas,
+  - ajustes de fluxo,
+  - prints lógicos (se quiser),
+  - checklist atualizado do que está completo e o que falta.
+
+Objetivo final
+--------------
+Depois dessas melhorias:
+
+- O voucher é validado cedo, com UX clara.
+- O admin tem auditoria total do uso.
+- Lotes de vou

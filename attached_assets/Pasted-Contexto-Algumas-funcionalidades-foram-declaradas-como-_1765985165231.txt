@@ -1,0 +1,180 @@
+Contexto
+--------
+Algumas funcionalidades foram declaradas como implementadas, porém após testes práticos foi confirmado que:
+
+- Parte do que foi dito NÃO está realmente funcionando.
+- Algumas funcionalidades NÃO foram implementadas.
+- O tratamento de erro na validação de voucher ainda é genérico (HTTP 400), sem diferenciação de causa.
+
+Este prompt tem dois objetivos:
+1) Auditar o código e confirmar o que foi realmente implementado.
+2) Corrigir e implementar o que está faltando, sem regressões.
+
+A documentação /docs/MODALIDADE_VOUCHER.md continua sendo a fonte de verdade.
+
+
+========================================
+1) AUDITORIA OBRIGATÓRIA (não pular esta etapa)
+========================================
+
+Antes de escrever qualquer código novo:
+
+1. Verifique no código-fonte se EXISTEM de fato:
+   - Endpoint de exportação de vouchers POR LOTE.
+   - Implementação funcional de criação de cupons em massa.
+   - Tratamento específico de erros no endpoint POST /api/vouchers/validate.
+
+2. Para cada item acima:
+   - Se estiver realmente implementado:
+     - Indicar exatamente:
+       - arquivo
+       - função
+       - rota
+   - Se NÃO estiver implementado ou estiver incompleto:
+     - Marcar como "NÃO IMPLEMENTADO" ou "IMPLEMENTAÇÃO PARCIAL".
+
+3. Atualizar /docs/MODALIDADE_VOUCHER.md com uma seção:
+   "Auditoria técnica – estado real do sistema"
+   descrevendo claramente:
+   - o que existe
+   - o que não existe
+   - divergências entre código e documentação
+
+
+========================================
+2) CORREÇÃO DO TRATAMENTO DE ERRO NA VALIDAÇÃO DE VOUCHER
+========================================
+
+Problema atual:
+- POST /api/vouchers/validate retorna HTTP 400 genérico.
+- No frontend:
+  - não é possível diferenciar se:
+    - voucher não existe
+    - voucher já foi utilizado
+    - voucher está expirado
+    - voucher pertence a outro evento
+    - erro técnico
+
+Correções obrigatórias:
+
+2.1 Backend
+- Ajustar o endpoint /api/vouchers/validate para retornar:
+  - HTTP 200 quando válido
+  - HTTP 409 ou 422 para erros de regra de negócio
+- Estrutura padrão de erro:
+  {
+    success: false,
+    error: {
+      code: 'VOUCHER_EXPIRED' | 'VOUCHER_USED' | 'VOUCHER_NOT_FOUND' | 'VOUCHER_INVALID_EVENT',
+      message: 'mensagem amigável para o usuário'
+    }
+  }
+
+2.2 Frontend
+- Mapear cada error.code para uma mensagem específica.
+- Bloquear avanço no fluxo SEM criar pedido ou inscrição.
+- Nunca exibir erro técnico genérico se for erro de regra de negócio.
+
+
+========================================
+3) IMPLEMENTAR EXPORTAÇÃO DE VOUCHERS (OBRIGATÓRIO)
+========================================
+
+Confirmado: exportação NÃO está implementada corretamente.
+
+Implementar:
+
+3.1 Backend
+- Endpoint:
+  GET /api/admin/events/:eventId/vouchers/export
+- Parâmetros:
+  - batchId (opcional)
+- Comportamento:
+  - Sem batchId → exporta todos os vouchers do evento
+  - Com batchId → exporta apenas vouchers daquele lote
+
+3.2 Formato
+- Exportar como:
+  - Excel (.xlsx) por padrão
+- Colunas mínimas:
+  - Código
+  - Lote
+  - Status
+  - Data início
+  - Data fim
+  - Usado?
+  - Data de uso
+  - Atleta (se houver)
+
+3.3 Frontend
+- Botão:
+  - “Exportar todos os vouchers”
+  - “Exportar este lote”
+- Nome do arquivo deve refletir:
+  - evento
+  - lote (se aplicável)
+
+
+========================================
+4) IMPLEMENTAR CRIAÇÃO DE CUPONS EM MASSA (OBRIGATÓRIO)
+========================================
+
+Confirmado: criação em massa de cupons NÃO foi implementada corretamente.
+
+Implementar:
+
+4.1 Backend
+- Endpoint de criação de cupons deve aceitar:
+  - quantity (quantidade de cupons a criar)
+  - discount_type (fixo / porcentagem / 100%)
+  - discount_value
+  - total_usage_limit
+  - usage_per_user_limit
+  - is_active (boolean)
+- Se quantity > 1:
+  - gerar códigos automaticamente
+  - garantir unicidade global (voucher + cupom)
+- Se códigos forem fornecidos manualmente:
+  - validar unicidade global
+
+4.2 Frontend
+- Tela de criação de cupons:
+  - campo quantidade
+  - campos de limite total e limite por usuário
+  - opção de deixar código em branco (auto-geração)
+  - toggle ativo/inativo
+
+4.3 Validações
+- Nunca permitir:
+  - códigos duplicados
+  - cupons ativos sem configuração válida
+- Retornar erros claros em caso de falha.
+
+
+========================================
+5) DOCUMENTAÇÃO E CHECKLIST
+========================================
+
+Ao final:
+
+1. Atualizar /docs/MODALIDADE_VOUCHER.md:
+   - Remover afirmações falsas de funcionalidades “implementadas”.
+   - Atualizar checklist:
+     - Implementado
+     - Corrigido
+     - Pendente
+
+2. Garantir que documentação e código estejam 100% alinhados.
+
+
+========================================
+OBJETIVO FINAL
+========================================
+
+Após este prompt:
+
+- Não haverá funcionalidades "fantasmas".
+- Exportação de vouchers funcionará corretamente.
+- Cupons em massa existirão de fato.
+- Validação de voucher terá UX clara e previsível.
+- A documentação refletirá a realidade do sistema.

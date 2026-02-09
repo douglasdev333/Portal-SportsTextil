@@ -1,0 +1,184 @@
+📌 Ajustes Necessários no Controle de Lotes
+
+No fluxo atual, ao atingir o limite de vagas do lote ativo, o sistema está fechando corretamente o lote, porém não está ativando o próximo lote automaticamente, deixando o sistema sem lote ativo e impossibilitando novas inscrições.
+
+Além disso:
+
+Existe a possibilidade de ativar mais de um lote ao mesmo tempo, o que não pode ocorrer.
+
+A coluna modality_id existe na tabela de lotes, porém o fluxo real não utiliza lotes específicos por modalidade — os lotes são globais por evento.
+➝ Se não houver nenhum uso funcional dessa coluna, ela deve ser removida.
+
+Abaixo seguem as instruções exatas para corrigir:
+
+🎯 Correções solicitadas
+1. Garantir que exista sempre um único lote ativo por evento
+
+Regras obrigatórias:
+
+Um evento só pode ter exatamente 1 lote ativo ao mesmo tempo.
+
+A interface de criação e edição de evento/lotes deve impedir o status active para mais de um lote.
+
+Caso o administrador tente ativar outro lote, o sistema deve:
+
+desativar/fechar o anterior,
+
+ou bloquear a ativação com mensagem apropriada.
+
+Tecnicamente:
+
+Criar validação:
+
+SELECT COUNT(*) FROM event_lots WHERE event_id = :eventId AND status = 'active'
+
+
+Se > 1 → inconsistência
+
+Se durante update:
+→ impedir alteração inválida
+
+2. Implementar a virada automática de lote dentro da transação atômica
+
+Na transação de inscrição:
+
+Quando o lote ativo estiver cheio (vagas_ocupadas >= capacity):
+
+O que fazer agora:
+
+Atualizar o lote atual:
+
+UPDATE event_lots
+SET status = 'closed'
+WHERE id = :currentLotId;
+
+
+Buscar o próximo lote com base em order_index:
+
+SELECT id
+FROM event_lots
+WHERE event_id = :eventId
+  AND status IN ('future')
+ORDER BY order_index
+LIMIT 1
+FOR UPDATE;
+
+
+Se existir, ativar:
+
+UPDATE event_lots
+SET status = 'active'
+WHERE id = :nextLotId;
+
+
+A inscrição deve ser concluída apenas se o novo lote tiver vagas_ocupadas < capacity.
+
+Caso NÃO exista próximo lote:
+→ retornar msg amigável:
+
+LOTE_ESGOTADO_E_SEM_PROXIMO
+
+3. Determinar como o sistema sabe qual é o próximo lote
+
+A definição deve vir de uma coluna de ordenação:
+
+✔ Campo recomendado já existente: order_index
+
+Regra:
+
+order_index ASC define a ordem natural dos lotes.
+
+O primeiro order_index que estiver com status future é o correto a ser ativado.
+
+Exemplo:
+
+order_index	status
+1	closed
+2	active
+3	future
+4	future
+
+Quando o lote 2 encher → lote 3 vira active
+
+4. Ajustar lógica da tela de criação/edição de eventos/lotes
+
+Regras na interface:
+
+Bloquear ativação manual de dois lotes.
+
+Caso usuário selecione um novo lote como ativo:
+
+automaticamente fechar ou desativar o que estiver ativo.
+
+Exibir alerta claro:
+
+"Somente um lote pode estar ativo ao mesmo tempo no mesmo evento."
+
+🎯 Sobre a coluna modality_id em event_lots
+
+Atualmente a coluna existe, porém:
+
+Os lotes estão funcionando para o evento inteiro, não por modalidade.
+
+O sistema de negócio que estamos adotando não exige lote por modalidade.
+
+Portanto:
+
+✔ Se NÃO houver regra explícita associando lotes a modalidades:
+👉 remover a coluna modality_id
+
+Ou
+
+✔ Caso seja necessário futuramente (não agora):
+👉 manter mas deixar documentado como não aplicável no fluxo de inscrição atual.
+
+🧩 Regras finais atualizadas
+
+Evento:
+
+Quando atingir o limite global → trava tudo.
+
+Modalidade (se houver limite):
+
+Travar só essa modalidade.
+
+Lote:
+
+Somente um ativo por evento
+
+Quando encher:
+
+fecha esse lote
+
+ativa o próximo (order_index ASC)
+
+Se não houver próximo lote:
+→ inscrições nessa modalidade/evento são encerradas
+
+💡 O que o LLM deve entregar
+
+Ajustes no backend:
+
+lock adequado e virada automática do lote
+
+validação de lote único ativo
+
+retorno de erros específicos
+
+Ajustes no front/admin:
+
+impedir múltiplos lotes ativos
+
+ordem transparente dos lotes
+
+Ajustes no banco:
+
+opcional: remover coluna modality_id
+
+Atualização da documentação gerando fluxograma atualizado:
+
+Event Full? → bloqueia tudo
+else
+   Modality Full? → bloqueia modalidade
+   else
+      Lot Full? → fechar lote → ativar próximo → tentar de novo

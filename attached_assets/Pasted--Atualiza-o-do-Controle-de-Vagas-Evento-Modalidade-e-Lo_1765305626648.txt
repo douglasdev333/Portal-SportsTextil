@@ -1,0 +1,260 @@
+📌 Atualização do Controle de Vagas (Evento, Modalidade e Lote)
+🎯 Contexto Geral
+
+O portal de inscrição possui eventos com limite de vagas.
+Inicialmente, o controle era baseado apenas no limite global do evento, impedindo que mais inscrições fossem criadas após atingir o limite.
+
+Agora o sistema deve suportar, dentro do mesmo evento,:
+
+Limite global de vagas para o evento
+
+Limite individual por modalidade (opcional)
+
+Limite individual por lote, incluindo:
+
+fechamento automático do lote quando atingir o limite,
+
+ativação automática do próximo lote disponível.
+
+Tudo preservando atomicidade e alta concorrência.
+
+🧠 Principais Premissas
+1. Evento é o limite principal (hard cap)
+
+Se event.capacity for atingido:
+
+nenhuma inscrição adicional é permitida,
+
+independentemente de modalidade ou lote ainda possuírem vagas.
+
+Regra global: evento lotou → tudo trava
+
+2. Modalidade é um limite local (opcional)
+
+Cada evento pode ter 0 ou mais modalidades.
+
+Exemplos:
+
+Corrida 5K
+
+Corrida 10K
+
+Caminhada
+
+Kids
+
+Podem ter limite individual por modalidade.
+
+Regras:
+
+Situação	Resultado
+modalidade possui capacity e atingiu esse valor	trava inscrições apenas nessa modalidade
+modalidade sem limite definido	depende apenas do evento e do lote
+3. Lote controla preço e vagas dentro da modalidade/evento
+
+Cada modalidade (ou o evento) pode ter 1 ou mais lotes.
+
+Exemplo de lotes:
+
+Nome	Exemplo capacity	Valor
+1º lote	200 vagas	R$ 100
+2º lote	300 vagas	R$ 130
+3º lote	sem limite	R$ 150
+
+Regras:
+
+Somente um lote ativo por modalidade/evento
+
+Quando um lote atingir o limite:
+
+ele é marcado como encerrado
+
+e o próximo se torna ativo, se existir
+
+O preço da inscrição é o do lote ativo na hora da confirmação
+
+Não se deve garantir valor apenas por visualizar na tela.
+
+🛠️ Estrutura de Banco Recomendada
+events
+id (PK)
+name
+capacity
+vagas_ocupadas
+...
+
+event_modalities
+id (PK)
+event_id (FK)
+name
+capacity NULLABLE  -- se NULL, sem limite próprio
+vagas_ocupadas INT DEFAULT 0
+
+event_lots
+id (PK)
+event_id (FK)
+modality_id (FK optional)
+capacity NULLABLE
+vagas_ocupadas INT DEFAULT 0
+status ENUM('active', 'closed', 'future')
+price_cents INT
+order_index INT NOT NULL   -- define a ordem natural dos lotes
+
+registrations
+id (PK)
+event_id FK
+modality_id FK NULLABLE
+lot_id FK NULLABLE
+athlete_id
+status
+...
+
+
+Regra importante:
+
+UNIQUE(event_id, athlete_id)
+
+🔄 Fluxo Atômico Atualizado na Inscrição
+
+Toda inscrição segue uma única transação contendo 3 travas (quando aplicável):
+
+✔ Ordem obrigatória de locking com SELECT FOR UPDATE
+
+Evento
+
+Modalidade (se houver)
+
+Lote ativo (se houver)
+
+Essa ordem previne deadlocks entre transações concorrentes.
+
+🔁 Etapas da transação
+BEGIN;
+
+1. Travar evento
+SELECT capacity, vagas_ocupadas
+FROM events
+WHERE id = :event_id
+FOR UPDATE;
+
+Se evento lotou:
+
+→ rollback
+→ return: EVENT_FULL
+
+2. Travar modalidade (se enviada)
+SELECT capacity, vagas_ocupadas
+FROM event_modalities
+WHERE id = :modality_id
+FOR UPDATE;
+
+
+Regra:
+
+condição	ação
+capacity != NULL AND vagas_ocupadas >= capacity	bloquear apenas essa modalidade
+modalidade não encontrada	erro MODALITY_NOT_FOUND
+3. Travar lote ativo
+SELECT id, capacity, vagas_ocupadas
+FROM event_lots
+WHERE event_id = :event_id
+  AND (modality_id = :modality_id OR modality_id IS NULL)
+  AND status = 'active'
+FOR UPDATE;
+
+
+Regras:
+
+condição	ação
+lot_capacity atingido	lote vira closed
+existe lote future com order_index maior	próximo lote vira active
+se não houver próximo lote	esgotado nesta modalidade
+
+🚨 Importantíssimo:
+
+O lote só garante o valor no momento do commit da transação.
+
+Isto evita inconsistência de preço.
+
+4. Verificar duplicidade
+
+Via UNIQUE constraint:
+
+se violar → erro ALREADY_REGISTERED
+
+5. Criar registro
+INSERT INTO registrations (...)
+VALUES (...);
+
+6. Atualizar contadores
+
+Cada entidade existente no fluxo incrementa 1:
+
+UPDATE events SET vagas_ocupadas = vagas_ocupadas + 1 WHERE id = :event_id;
+
+UPDATE event_modalities SET vagas_ocupadas = vagas_ocupadas + 1 WHERE id = :modality_id;
+
+UPDATE event_lots SET vagas_ocupadas = vagas_ocupadas + 1 WHERE id = :lot_id;
+
+COMMIT;
+
+❌ Quando a transação deve falhar
+Código	Motivo
+EVENT_FULL	limite geral atingido
+MODALITY_FULL	modalidade atingiu limite
+LOT_FULL	lote lotou antes dessa inscrição
+MODALITY_NOT_FOUND	modalidade inválida
+LOT_NOT_FOUND	lote inválido para modalidade
+ALREADY_REGISTERED	mesmo atleta tentando inscrição
+🧩 Estratégia para Lote Pago
+
+Como NÃO haverá reserva prévia, regra a seguir:
+
+Quando o usuário envia o formulário, o backend:
+
+Confirma acesso ao lote ativo via SELECT FOR UPDATE
+
+Garante que ainda há vaga
+
+Gera inscrição com lot_id e price_cents daquele lote
+
+Se o lote lotar naquele exato instante:
+
+retorna erro LOT_SOLD_OUT_OR_CHANGED
+
+front deve refazer consulta e exibir novo preço/lote
+
+Nunca migrar automaticamente o usuário de lote sem consentimento.
+
+🧪 Testes recomendados
+Eventos
+
+✔ Bloqueia novas inscrições quando lotado
+
+Modalidades
+
+✔ Modalidade lotou, outras continuam abertas
+✔ Modalidade sem limite respeita apenas o evento
+
+Lote
+
+✔ Lote ativo vira fechado quando lotado
+✔ Próximo lote vira ativo
+✔ Inscrição simultânea respeita lote correto
+
+Concorrência
+
+✔ 100 requisições paralelas
+→ confere que contadores batem
+→ nenhuma ultrapassa limite
+
+💎 Resultado Esperado
+
+Com essas implementações:
+
+✔ Nenhuma condição de corrida gera overbooking
+✔ Sempre confirma a inscrição com lote e preço corretos
+✔ Modalidades podem esgotar individualmente
+✔ Evento pode encerrar todas as inscrições
+✔ Com alta concorrência o sistema se mantém consistente
+✔ Lote vira de forma segura e previsível dentro da transação

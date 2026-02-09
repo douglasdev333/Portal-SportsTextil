@@ -1,0 +1,144 @@
+"Contexto
+--------
+A lógica de ""Gerenciamento de Lotes de Inscrição"" já está implementada corretamente no gerenciador de eventos:
+
+- status = regra de negócio ('future', 'active', 'closed')
+- ativo = apenas visibilidade para atleta
+- ações (Ativar, Fechar, Marcar Futuro, Visibilidade) funcionam via botões específicos
+- edição do lote é separada da mudança de status
+- order_index define a ordem dos lotes e a virada automática do próximo lote
+
+Porém, as **telas de criação e edição de evento**, especificamente a seção onde os lotes são criados e editados dentro do formulário do evento, **ainda não seguem esse modelo**.  
+Atualmente essas telas NÃO estão alinhadas com:
+
+- a estrutura correta de status
+- a separação entre status e visibilidade
+- o fluxo de ativação
+- o controle de `order_index`
+- as mesmas regras e validações existentes no gerenciador de eventos
+
+Essas telas precisam ser atualizadas para ficarem **idênticas em comportamento, regras e UX** ao gerenciador de lotes.
+
+
+O que quero que você faça
+-------------------------
+
+## 1) Atualizar a parte de LOTE nas telas de CRIAÇÃO e EDIÇÃO de EVENTO para seguir o mesmo modelo já usado no gerenciador de eventos
+
+A seção de lotes dentro da criação/edição de evento deve:
+
+- usar os mesmos componentes, estruturas e regras do gerenciador de lotes
+- incluir as mesmas ações:
+  - Ativar lote → status='active', ativo=true, fechar outros ativos
+  - Fechar lote → status='closed'
+  - Marcar como futuro → status='future'
+  - Alternar Visibilidade → altera somente ativo
+- impedir que status seja editado por input comum (dropdown, checkbox etc.)
+- permitir alterar somente as informações de configuração:
+  - nome
+  - quantidade máxima
+  - datas
+  - preço (se houver)
+  - **order_index**
+- isolar ações de estado em botões específicos (não no formulário)
+
+Em resumo:  
+**A gerência de estado do lote deve funcionar da MESMA FORMA que no gerenciador de lotes do evento.**
+
+Isso significa que a tela de criação/edição de evento deve usar exatamente o mesmo padrão e fluxo.
+
+
+## 2) Incluir input de `order_index` no modal de edição de lote (dentro da edição de evento)
+
+Hoje esse input NÃO existe.  
+Quero que:
+
+- exista um input de ordem (`order_index`) no modal de edição de lote
+- ele deve:
+  - ser número inteiro >= 1
+  - não permitir vazio
+  - ter validação de duplicidade:
+    - se outro lote já usa a mesma ordem → exibir erro amigável
+- ao salvar o lote:
+  - atualizar somente os campos editáveis (nome, datas, capacidade, order_index)
+  - não alterar `status` nem `ativo` automaticamente
+
+Isso é essencial para:
+
+- definir corretamente a ordem de virada automática
+- reorganizar lotes futuros
+- corrigir inconsistências na progressão dos lotes
+
+
+## 3) Ajustar criação de lote dentro da criação/edição de evento
+
+Ao criar lote dentro do formulário de evento:
+
+- `status` padrão deve ser SEMPRE `'future'`
+- `ativo` padrão deve ser `true`
+- `order_index` deve ser:
+  - fornecido manualmente pelo admin, OU
+  - se não fornecido, gerado automaticamente como:
+    - MAX(order_index) + 1 para o evento
+
+As telas devem refletir essas regras claramente.
+
+
+## 4) A tela deve mostrar os lotes da mesma forma que o gerenciador
+
+Na criação e edição de evento:
+
+- listar lotes com os mesmos badges do gerenciador:
+  - Status: Futuro / Ativo / Fechado
+  - Visível/Oculto
+  - Lotado
+  - Expirado
+- disponibilizar os mesmos botões:
+  - Ativar / Fechar / Futuro / Visibilidade
+- manter a consistência de UI/UX com o gerenciador do evento
+
+
+## 5) Testes e validações de interação
+
+Os seguintes cenários devem funcionar tanto no gerenciador quanto na tela de edição/criação de evento:
+
+### Teste 1 — Alteração de ordem
+- Evento com 3 lotes:
+  - L1 → order 1
+  - L2 → order 2
+  - L3 → order 3
+- Editar L3 → mudar para order 1
+- Salvar
+- Verificar que a ordenação na UI respeita o backend
+- Virada automática do lote futuro deve considerar a nova ordem
+
+### Teste 2 — Ações de estado
+- Ativar lote dentro da criação/edição de evento
+- Lote ativado deve:
+  - status='active'
+  - ativo=true
+  - outros ativos → status='closed'
+
+### Teste 3 — Visibilidade
+- Ocultar lote → `ativo=false`
+- Não deve impactar status
+- No futuro, quando listarmos lotes para atletas, só devem aparecer os visíveis
+
+### Teste 4 — Consistência entre interfaces
+- Todas as interações da tela de criação/edição devem resultar nos MESMOS dados que seriam gerados se as ações fossem feitas pelo gerenciador principal.
+
+
+Objetivo final deste prompt
+---------------------------
+Depois dessas mudanças, as telas de criação e edição de evento (seção de lotes):
+
+- funcionarão exatamente como o painel de gerenciamento de lotes
+- terão suporte completo ao novo modelo:
+  - status = regra de negócio
+  - ativo = visibilidade
+  - order_index editável e validado
+- permitirão criar e gerenciar lotes corretamente sem sair da edição de evento
+- manterão lógica consistente em toda a aplicação
+- evitarão bugs ao criar eventos com múltiplos lotes
+
+"

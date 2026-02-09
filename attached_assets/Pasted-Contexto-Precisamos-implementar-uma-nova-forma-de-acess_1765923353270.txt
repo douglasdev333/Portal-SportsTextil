@@ -1,0 +1,137 @@
+Contexto
+--------
+Precisamos implementar uma nova forma de acesso à inscrição: modalidade do tipo “voucher”.
+
+Essa funcionalidade deve permitir que uma inscrição só possa ser realizada se o participante informar um código de voucher válido. O voucher pode ser gratuito ou pago, dependendo do lote. Além disso, o sistema deve incluir um módulo completo para criação, gerenciamento e fiscalização de vouchers e cupons.
+
+Objetivos principais
+---------------------
+1. Criar o tipo de modalidade “voucher”.
+2. Exigir voucher antes de criar pedido/inscrição.
+3. Criar módulo robusto de gestão de vouchers e cupons por evento.
+4. Permitir cupons de desconto (não obrigatórios).
+5. Registrar e rastrear uso dos vouchers (auditoria).
+6. Suportar geração em massa de códigos únicos.
+7. Permitir validade por lote ou avulsa.
+8. Evitar previsibilidade ou duplicação de códigos.
+
+Detalhamento da nova modalidade “voucher”
+-----------------------------------------
+### 1. Regras de negócio
+- Modalidade terá um novo campo: `access_type = 'voucher'`.
+- Para concluir a inscrição, o usuário deve informar um **voucher válido** ANTES de gerar pedido ou entrar na tela de pagamento.
+- A inscrição pode ter:
+  - valor normal do lote (se existir)
+  - OU valor zero (modalidade gratuita), **mas ainda assim com voucher obrigatório**
+
+### 2. Fluxo no frontend
+No fluxo de inscrição, antes da criação do pedido:
+- Se a modalidade for voucher:
+  - Exibir input “Código do Voucher”.
+  - Validar esse código via endpoint.
+  - Se inválido → bloquear passos seguintes.
+  - Se válido → seguir fluxo normal (criar pedido e prosseguir ao pagamento, se necessário).
+
+### 3. Regras de validação do voucher
+- Deve ser único.
+- Deve pertencer ao evento atual.
+- Deve estar dentro da validade:
+  - `valid_from <= now <= valid_until`.
+- Não pode estar marcado como usado.
+- Não pode ultrapassar limite de uso (1 uso por participante).
+- Se for criado em lote, respeitar validade definida do lote.
+- Deve registrar:
+  - quem usou
+  - quando usou
+  - inscrição vinculada
+
+### 4. Módulo de gerenciamento de vouchers (admin)
+Adicionar no painel do evento uma nova aba:
+**Gerenciador de Vouchers e Cupons**
+
+O módulo deve permitir:
+
+#### A) Criar lote de vouchers
+- Quantidade: até 50.000 vouchers
+- Códigos:
+  - aleatórios, não sequenciais
+  - hexadecimal curto (6–10 chars)
+  - sem padrão previsível
+  - baixa probabilidade de colisão
+- Atributos do lote:
+  - nome do lote
+  - quantidade
+  - validade inicial
+  - validade final
+  - descrição opcional
+
+#### B) Criar voucher avulso
+- Código único
+- Datas independentes
+- Atributos iguais aos do lote
+
+#### C) Listagem e auditoria
+Para cada voucher:
+- código
+- lote (se houver)
+- status: “livre”, “utilizado”, “expirado”
+- quem utilizou (nome + inscrição)
+- data/hora do uso
+
+Para cupons:
+- tipo: valor fixo, porcentagem, 100%
+- limite de uso por usuário
+- total de usos
+- validade
+- vinculação ao evento
+- regra: cupom só funciona no evento ao qual pertence
+
+### 5. Integração com cupons de desconto
+Os vouchers obrigatórios para modalidade **não concedem desconto**.  
+Eles apenas habilitam a inscrição.
+
+Os cupons existem para:
+- dar desconto parcial
+- dar desconto total
+- funcionar apenas na tela de pagamento (não antes)
+
+### 6. Fluxo do pedido + pagamento
+- O voucher deve ser validado **antes** do pedido existir.
+- Após validar o voucher:
+  - Criar inscrição + pedido
+  - Se houver valor > 0 → seguir para pagamento
+  - Se valor = 0 → direto para inscrição confirmada
+- O cupom é introduzido somente na tela de pagamento.
+
+### 7. Tabelas necessárias (sugestão)
+- `event_vouchers`  
+- `event_voucher_batches`  
+- `event_coupons`  
+- `voucher_usages` (auditoria)  
+- `coupon_usages`
+
+### 8. Segurança
+- Códigos nunca devem ser previsíveis.
+- Deve existir checagem antifraude:
+  - rate-limit na tentativa de usar vouchers
+  - registro de uso e IP
+- Código válido só conta como usado após inscrição confirmada.
+
+### 9. Relatórios
+- Total de vouchers utilizados
+- Vouchers expirados
+- Vouchers disponíveis
+- Auditoria completa por código
+
+Entrega esperada
+----------------
+1. Implementação completa da modalidade “voucher”.
+2. Tela de gerenciamento de vouchers e cupons no admin do evento.
+3. Ajuste do fluxo de inscrição para exigir voucher quando necessário.
+4. Documentação completa no arquivo `/docs/MODALIDADE_VOUCHER.md` contendo:
+   - Regras de negócio
+   - Diagramas de fluxo
+   - Impacto no backend e frontend
+   - Estrutura de tabelas
+   - Exemplos de endpoints
+   - Lista do que falta implementar (checklist)

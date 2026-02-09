@@ -1,0 +1,179 @@
+🚨 Correções Necessárias no Controle e Ordenação de Lotes
+
+Após as atualizações entregues, ainda existem comportamentos incorretos relacionados aos lotes.
+Preciso que a lógica seja revisada e corrigida prioritariamente nos seguintes pontos:
+
+❗ PROBLEMA 1 — Todos os lotes estão com order_index = 1
+
+Hoje quando criamos ou editamos lotes, o campo order_index está sendo atribuído sempre com valor 1, e o admin não tem opção de editar sua ordem.
+
+Isso impede:
+
+ativação correta do próximo lote
+
+fechamento automático com transição válida
+
+ordenação confiável
+
+✅ O que deve ser corrigido
+1. Durante a criação de lote:
+
+Se o admin não informar manualmente a ordem, o sistema deve atribuir automaticamente o próximo índice sequencial:
+
+Exemplo:
+
+Se os lotes existentes possuem:
+
+id	order_index
+5	1
+6	2
+
+Então no próximo lote criado:
+
+→ order_index = 3 automaticamente
+
+SQL sugerido:
+
+SELECT COALESCE(MAX(order_index), 0) + 1
+FROM registration_batches
+WHERE event_id = :eventId;
+
+2. Na edição de lote
+
+O sistema deve permitir que o admin altere order_index.
+
+Regras obrigatórias:
+
+Não pode existir mais de um lote com o mesmo order_index
+
+Alterações devem ser validadas antes de salvar
+
+Ao editar:
+
+Se alguém tentar colocar order_index já existente:
+
+→ retornar erro amigável:
+
+ORDER_INDEX_ALREADY_EXISTS
+"Já existe um lote usando essa ordem. Altere a ordem dos demais ou utilize outro número."
+
+❗ PROBLEMA 2 — Admin não consegue ordenar lotes visualmente
+
+Preciso que:
+
+No painel admin:
+
+A listagem dos lotes seja exibida ordenada por order_index ASC
+
+Haja campo visível de edição do campo order_index
+
+Ao alterar um lote:
+
+o sistema deve persistir corretamente o valor
+
+validar duplicidade conforme regra acima
+
+❗ PROBLEMA 3 — Próximo lote não está sendo ativado quando necessário
+
+Hoje o lote fecha, mas não existe identificação clara do próximo lote.
+
+Isso acontece porque:
+
+sem order_index válido, a query de próximo lote não funciona
+
+os lotes ficam com o mesmo índice, logo não há próximo
+
+Revisar a lógica de ativação com base obrigatória em order_index
+
+Após fechamento do lote atual:
+
+buscar:
+
+SELECT id
+FROM registration_batches
+WHERE event_id = :eventId
+  AND status = 'future'
+  AND order_index > currentOrder
+ORDER BY order_index ASC
+LIMIT 1;
+
+
+Se retornar resultado → ativar lote
+
+Se não retornar resultado →
+→ LOT_ESGOTADO_SEM_PROXIMO
+
+❗ PROBLEMA 4 — Testar lote expirando por data com fuso horário
+
+Hoje a lógica de expiração está avaliando datas usando UTC (3h à frente do Brasil).
+
+Quando for validar data de início ou término do lote, precisa considerar:
+
+Regra correta
+
+Hora base deve ser:
+
+NOW() AT TIME ZONE 'America/Sao_Paulo'
+
+
+—
+
+Exemplo de query correta:
+
+SELECT *
+FROM registration_batches
+WHERE event_id = :eventId
+  AND status = 'active'
+  AND (
+    expiration_at IS NULL
+    OR expiration_at <= (NOW() AT TIME ZONE 'America/Sao_Paulo')
+  )
+
+❗ Solicitação adicional: Criar um evento de teste e resetar banco
+
+Peço que:
+
+🧹 Limpe as seguintes tabelas:
+
+events
+
+registrations
+
+registration_batches
+
+event_modalities (se existir)
+
+qualquer tabela auxiliar relacionada
+
+❗ IMPORTANTE:
+➡️ Não excluir registros da tabela de administradores
+
+🧪 Criar automaticamente este conjunto de dados de teste:
+Evento
+Evento Teste Transição de Lotes
+capacity = 250
+
+Lotes
+nome	order_index	capacity	price_cents	status
+Lote 1	1	50	10000	active
+Lote 2	2	100	12000	future
+Lote 3	3	100	14000	future
+Cenário esperado:
+
+Ao simular 50 inscrições → lote 1 deve fechar e lote 2 deve ativar
+
+Ao simular +100 → lote 2 fecha e lote 3 ativa
+
+Ao simular +100 → lote 3 esgota e retorna LOT_ESGOTADO_SEM_PROXIMO
+
+🧠 Em resumo, o que deve sair desta revisão:
+
+✔ order_index calculado automaticamente
+✔ admin pode alterar order_index manualmente
+✔ validação que evita duplicidade de ordem
+✔ migração segura do lote ativo para próximo lote
+✔ expiração usando horário de São Paulo
+✔ criação de evento e lotes de teste
+✔ limpeza seletiva do banco antes do teste
+
+👉 Execute a revisão com prioridade nessas correções.

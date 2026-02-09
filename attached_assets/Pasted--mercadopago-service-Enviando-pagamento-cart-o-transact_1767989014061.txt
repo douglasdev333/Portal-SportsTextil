@@ -1,0 +1,59 @@
+[mercadopago-service] Enviando pagamento cartão: {
+  transaction_amount: 1,
+  payment_method_id: 'master',
+  installments: 1,
+  issuer_id: 12531,
+  has_token: true,
+  has_identification: true,
+  payer_email: 'Jose@gmail.com'
+}
+[mercadopago-service] Resposta pagamento: {
+  id: 140705821735,
+  status: 'rejected',
+  status_detail: 'cc_rejected_high_risk'
+}
+8:02:47 PM [express] POST /api/payments/create 200 in 1981ms :: {"success":true,"data":{"paymentId":…
+[webhook] ========== WEBHOOK RECEBIDO ==========
+[webhook] Headers: {
+  "host": "097ef97f-2f6e-4019-b3da-aef055444056-00-18onx1oz230uu.worf.replit.dev",
+  "user-agent": "MercadoPago WebHook v1.0 payment",
+  "content-length": "188",
+  "accept": "application/json",
+  "accept-encoding": "gzip",
+  "content-type": "application/json",
+  "referer": "https://mercadopago.com.ar",
+  "traceparent": "00-0f45f4a082907c1c55d2247c9dbd07ba-73c0a7df718870ff-00",
+  "x-b3-parentspanid": "867fcffbaf230ef8",
+  "x-b3-sampled": "0",
+  "x-b3-spanid": "73c0a7df718870ff",
+  "x-b3-traceid": "0f45f4a082907c1c55d2247c9dbd07ba",
+  "x-forwarded-for": "18.206.34.84, 10.83.2.20",
+  "x-forwarded-proto": "https",
+  "x-replit-user-bio": "",
+  "x-replit-user-id": "",
+  "x-replit-user-name": "",
+  "x-replit-user-profile-image": "",
+  "x-replit-user-roles": "",
+  "x-replit-user-teams": "",
+  "x-replit-user-url": "",
+  "x-request-id": "3bf8a3a9-8659-44bb-87b4-9d1c1414cc6e",
+  "x-rest-pool-name": "pool_unknown",
+  "x-signature": "ts=1767988967,v1=39c9874a07db6e2858e8f4740185ead6f5faf99c16aa671ac73a24c616a1f82f",
+  "x-socket-timeout": "25000",
+  "x-trace-digest-68": "MNhWl0i+/CCYv6RxPoKf4o+Tur/oW5yF911JZ4XBgvpmvKtgUGb3c+/sA2yYISVuBMTetdDqVX7QzuM06m2umFqitgDW+tRYaIMh9BFfZ53yqBirs54AjQtSTa23ne6I6YSYqpcA3QQ83qpuLdVmE6DyhiQVJRXyGySZbmtfCcI="
+}
+[webhook] Body: {
+  "action": "payment.created",
+  "api_version": "v1",
+  "data": {
+    "id": "140705821735"
+  },
+  "date_created": "2026-01-09T20:02:46Z",
+  "id": 128051637050,
+  "live_mode": true,
+  "type": "payment",
+  "user_id": "402648949"
+}
+[webhook] ========================================
+[webhook] Notificação recebida: type=payment, data.id=140705821735
+[webhook] Status do pagamento 140705821735: rejected

@@ -1,0 +1,245 @@
+Contexto
+--------
+Atualmente o usuário tem a tela “Minhas Inscrições”, onde aparecem os pedidos e dentro de cada pedido há uma ou mais inscrições. Porém:
+
+- A navegação é confusa.
+- Não há uma visão centralizada do “Pedido”.
+- O usuário não vê as inscrições agrupadas de forma clara.
+- O fluxo de pagamento não está bem integrado com a experiência do usuário.
+- Informações importantes do PIX gerado pelo Mercado Pago não estão salvas no pedido.
+- Regras de expiração de pagamento (30 minutos) não estão totalmente implementadas na UI.
+
+Quero uma **refatoração completa da tela de Pedido** (Order View) incluindo:
+
+1) UX nova e organizada
+2) Comportamentos claros para pedidos pagos, pendentes, expirados e cancelados
+3) Suporte a múltiplas inscrições dentro de um mesmo pedido
+4) Suporte ao fluxo PIX + Cartão com regras de expiração
+5) Salvamento seguro das informações de pagamento (especialmente PIX)
+6) Ações adequadas ao status do pedido
+7) Comprovantes individuais por inscrição
+
+
+Objetivo da refatoração
+------------------------
+Criar uma **tela central de Pedido**, que sirva como:
+
+- Página de controle do pagamento
+- Listagem das inscrições do pedido
+- Local para baixar comprovantes
+- Ferramentas para reabrir pagamento/desistir/tentar outro método
+- Fonte da verdade para o status do pedido e inscrições
+
+
+Requisitos detalhados
+---------------------
+
+# 1) Estrutura Geral da NOVA Tela de Pedido
+
+A tela deve ter blocos claros:
+
+## (A) Cabeçalho do Pedido
+- Número do pedido (order_id)
+- Data da criação
+- Status do pedido (com badge visual)
+- Relógio de contagem regressiva, se aplicável (ex.: pagamento pendente até X:XX)
+
+## (B) Status e Ações do Pedido
+Dependendo do status:
+
+### STATUS: "PENDING_PAYMENT"
+- Mostrar:
+  - Mensagem clara: “Seu pagamento ainda não foi concluído.”
+  - Tempo restante (30 min desde a criação do pedido).
+- Botões:
+  - "Pagar com PIX"  
+  - "Pagar com Cartão de Crédito"
+- Se um PIX já foi gerado:
+  - Mostrar QR Code
+  - Mostrar código copia e cola
+  - Mostrar tempo restante do PIX (30 min desde geração)
+  - **Botão: “Trocar forma de pagamento”** → reabrir tela de pagamento e cancelar PIX anterior internamente
+
+### STATUS: "PAID"
+- Mostrar:
+  - “Pagamento confirmado!”
+  - Independente do número de inscrições, cada uma deve ter:
+    - Status da inscrição
+    - Botão de baixar comprovante
+    - Dados essenciais
+
+### STATUS: "EXPIRED"
+- Mostrar:
+  - “O tempo para pagamento acabou.”
+  - Nenhum botão de pagamento deve aparecer.
+  - Inscrições associadas devem estar canceladas.
+
+### STATUS: "CANCELED"
+- Mostrar:
+  - “Pedido cancelado.”
+  - Mesmas regras de EXPIRED.
+
+### STATUS: "FAILED"
+- Mostrar:
+  - “Falha no pagamento.”
+  - Botão para tentar novamente (iniciar novo pagamento).
+
+
+# 2) Exibição das INSCRIÇÕES dentro do Pedido
+
+Cada pedido pode conter **1 ou mais inscrições**.
+
+Criar um componente:
+
+## Se o pedido tem APENAS 1 inscrição:
+- A tela dá foco diretamente nessa inscrição.
+- Mostrar:
+  - Nome do inscrito
+  - Modalidade
+  - Número de peito (se já definido)
+  - Status da inscrição
+  - Botão de baixar comprovante
+- Não é necessário mostrar “lista”.
+
+## Se o pedido tem MAIS de 1 inscrição:
+- Mostrar um card “Resumo das Inscrições”
+- Cada item:
+  - Nome do participante
+  - Status
+  - Modalidade
+  - Botão “Ver detalhes”
+  - Botão “Baixar comprovante”
+- No topo:
+  - Badge: “3 inscrições neste pedido”
+  - Colapsável/accordion opcional
+
+
+# 3) Armazenamento dos dados do pagamento (especialmente PIX)
+
+Sempre que um pagamento PIX for criado no Mercado Pago, salvar **dentro do pedido**:
+
+- transaction_id
+- qr_code_base64
+- qr_code_text (copia e cola)
+- pix_expiration
+- preference_id (se houver)
+- valor
+- data/hora da geração do PIX
+
+Esses dados devem ser recuperáveis na tela do pedido.
+
+### Regras:
+- **PIX só é válido por 30 minutos.**
+- Após expirar, deve aparecer:
+  - QR code apagado / bloqueado
+  - Botão “Gerar novo PIX”
+  - Botão “Trocar forma de pagamento”
+
+- Se o usuário clicar em “Trocar forma de pagamento”, a tela deve:
+  - invalidar o PIX atual no backend (se aplicável)
+  - permitir ir para cartão de crédito
+
+
+# 4) Fluxo de pagamento completo (baseado no docs/PLANO_FLUXO_PAGAMENTO.md)
+
+Fluxo resumido:
+
+- O pedido é criado com status: **PENDING_PAYMENT**
+- Inicia-se pagamento (PIX ou Cartão)
+- O usuário tem **30 minutos** para pagar
+- Se pagar → status do pedido = **PAID**
+  - todas as inscrições são ativadas
+- Se não pagar em 30 min → pedido = **EXPIRED**
+  - inscrições = **CANCELED**
+- Se falhar pagamento → pedido = **FAILED**
+- Se o usuário tentar pagar com PIX mas desistir:
+  - backend deve permitir gerar novo método de pagamento
+
+
+# 5) UX para troca de método de pagamento
+
+O usuário pode:
+
+- Gerar um PIX
+- Voltar e decidir pagar com cartão
+- Ou vice-versa
+
+Regras:
+
+- A tela do pedido deve oferecer:
+  - botão "Trocar forma de pagamento"
+  - sem recriar o pedido
+  - apenas iniciando novo método de pagamento
+
+- Caso um PIX esteja ativo e o usuário queira trocar:
+  - o backend deve:
+    - invalidar o PIX anterior (se necessário)
+    - abrir nova preference de cartão ou novo PIX
+    - atualizar os dados do pedido
+
+- A UI deve refletir tudo de forma clara.
+
+
+# 6) Cancelamento automático
+
+Quando o pagamento não é concluído:
+
+- Após 30 minutos → pedido = EXPIRED
+- Todas as inscrições associadas → CANCELED
+- A tela deve exibir isso claramente.
+
+
+# 7) Comprovantes de inscrição
+
+Cada inscrição deve ter:
+
+- Botão de baixar PDF
+- PDF gerado sob demanda (não no endpoint de inscrição)
+- Acessível dentro da tela do pedido
+- Em pedidos com várias inscrições → botão em cada card
+
+
+Checklist da implementação
+--------------------------
+
+### Backend:
+- Salvar dados do pagamento (PIX/Cartão)
+- Endpoints para:
+  - getOrder(order_id)
+  - retryPayment(order_id)
+  - generatePix(order_id)
+  - generateCardPayment(order_id)
+- Invalidação de PIX quando trocar método
+- Expiração automática (cron ou worker)
+- Atualização de status das inscrições conforme status do pedido
+
+### Frontend:
+- Nova tela de Pedido com layout completo
+- Suporte a múltiplas inscrições
+- QR Code PIX + copiar código
+- Contagem regressiva
+- Botões de ação conforme status
+- Baixar comprovante individual
+
+### Testes:
+- Pedido com 1 inscrição
+- Pedido com 3 inscrições
+- PIX gerado, usuário troca para cartão
+- PIX expira e usuário gera novo
+- Pagamento confirmado
+- Pagamento não confirmado → expira
+- Tentativa de pagar fora do prazo → bloquear
+
+
+Objetivo final
+--------------
+Após essa refatoração, a tela de Pedido será:
+
+- clara
+- funcional
+- segura
+- consistente com o fluxo de pagamento real
+- adequada para múltiplas inscrições
+- resiliente a abandono de carrinho e troca de método de pagamento
+
+E o usuário terá controle total do pedido em um único lugar.

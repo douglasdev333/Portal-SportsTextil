@@ -1,0 +1,88 @@
+
+3. Modalidades do Evento
+O evento pode ter várias modalidades (ex: 5km, 10km, 21km, kids, caminhada, etc.). Para cada modalidade deve ser possível configurar:
+3.1 Dados básicos da modalidade
+
+Nome da modalidade (ex: “21km Solo”, “5km PCD”, “Kids 400m”)
+Distância (em km ou metros)
+Horário exato da largada
+Descrição específica da modalidade
+Imagem da modalidade (opcional)
+
+3.2 Tipo de acesso à modalidade
+
+Gratuita
+Paga (definir valor por lote – ver item 4)
+Exige código de cortesia / voucher
+Exclusiva para PCD (com ou sem acompanhante)
+Exige confirmação manual pelo organizador
+
+3.3 Percurso
+
+Upload de imagem do mapa do percurso OU link externo (GPX, Strava, imagem, etc.)
+Descrição do percurso (altimetria, tipo de terreno, pontos de hidratação, etc.)
+
+3.4 Grade de camisas (kit)
+
+Ativar ou não entrega de camisa
+Se ativado: definir tamanhos disponíveis e quantidade em estoque para cada tamanho
+Exemplo: PP (50), P (200), M (300), G (250), GG (100), etc.
+Permitir que o atleta escolha o tamanho no momento da inscrição
+
+4. Lotes de Inscrição (sistema de precificação por fases)
+O sistema deve suportar múltiplos lotes (promocional, 1º lote, 2º lote, etc.).
+Para cada lote configurar:
+
+Nome do lote (ex: “Lote Promocional”, “1º Lote”, “Lote Final”)
+Data/hora de início do lote
+Data/hora de término do lote OU quantidade máxima de inscrições nesse lote
+Valor específico para cada modalidade nesse lote
+Ex: 5km → R$ 79,90 | 10km → R$ 99,90 | 21km → R$ 139,90
+O sistema muda automaticamente para o próximo lote quando atingir a data ou o limite de vagas do lote atual
+
+5. Arquivos Anexos do Evento
+
+Seção para upload de quantos arquivos quiser
+(regulamento, termo de responsabilidade, autorização de imagem, etc.)
+Para cada arquivo:
+→ Nome personalizado (ex: “Regulamento Oficial 2026”)
+→ Arquivo (PDF, DOC, etc.)
+→ Obrigatório para inscrição? (sim/não)
+
+6. Fluxo de Criação do Evento (RF10)
+RF10.1 – Iniciar criação
+
+Botão “Criar novo evento” no dashboard do administrador
+Formulário em uma única página com seções expansíveis/colapsáveis OU assistente passo a passo (ambos aceitáveis)
+Validação de todos os campos obrigatórios ao tentar salvar/publicar
+Geração automática de ID único do evento
+
+RF10.2 – Salvar rascunho
+
+Botão “Salvar rascunho” disponível a qualquer momento
+Todos os dados preenchidos são salvos, mesmo se o evento estiver incompleto
+Administrador pode voltar depois e continuar editando
+
+RF10.3 – Após criação/publicação
+
+Evento aparece na lista do dashboard com status:
+→ Rascunho (edição ainda possível)
+→ Publicado (visível ao público e inscrições abertas se ativado)
+Checkbox “Ativar inscrições imediatamente” ao publicar
+
+RF10.4 – Pré-visualização
+
+Botão “Visualizar como atleta”
+Abre o evento exatamente como o usuário final verá (página pública)
+Disponível tanto em rascunho quanto publicado
+
+7. Resumo dos Campos Obrigatórios (validação no salvamento final)
+
+Nome do evento
+Data do evento
+Local
+Pelo menos uma modalidade
+Período de inscrições (início e fim)
+Limite de vagas por modalidade
+Pelo menos um lote configurado por modalidade paga
+Regulamento ou aceite de responsabilidade (pode ser via checkbox ou arquivo obrigatório)

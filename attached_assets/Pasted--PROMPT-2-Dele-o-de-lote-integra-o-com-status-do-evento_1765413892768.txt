@@ -1,0 +1,143 @@
+"
+---
+
+## 🧱 PROMPT 2 – Deleção de lote + integração com status do evento (expirado/publicado)
+
+```text
+Contexto
+--------
+Temos mais dois problemas relacionados a lotes e ao status do evento na tela do cliente:
+
+1. A função de deletar lote **não está funcionando**:
+   - Precisa funcionar, mas com segurança:
+     - Se houver pedidos/inscrições vinculados ao lote, ele NÃO pode ser deletado.
+
+2. O status do evento na tela do cliente:
+   - Está sendo marcado como ""expirado"" quando não há lote válido → isso está OK.
+   - Porém, o inverso não está funcionando:
+     - Ativar um lote não altera o status do evento
+     - E ao publicar o evento, ele volta a ficar ""expirado"" porque a lógica depende do status dos lotes.
+
+3. Não é seguro ""publicar automaticamente"" o evento ao ativar um lote, mas:
+   - Quando o evento está expirado e o admin ativa um lote, seria interessante:
+     - PERGUNTAR ao admin se ele quer publicar o evento agora
+     - e só mudar o status do evento se ele confirmar.
+
+
+Parte 1 – Deleção de lote com segurança
+---------------------------------------
+
+Quero que:
+
+1. A função de deletar lote seja implementada corretamente, com as seguintes regras:
+
+   - Se o lote NÃO tiver nenhuma inscrição/pedido associado:
+     - permitir deletar normalmente
+   - Se o lote tiver inscrições/pedidos:
+     - bloquear exclusão
+     - retornar erro claro:
+       - código: `BATCH_HAS_REGISTRATIONS`
+       - mensagem: ""Este lote possui inscrições vinculadas e não pode ser apagado.""
+
+2. No frontend/admin:
+   - Ao tentar excluir um lote:
+     - Exibir confirmação:
+       - ""Tem certeza que deseja excluir este lote?""
+     - Se o backend retornar o erro `BATCH_HAS_REGISTRATIONS`:
+       - Mostrar mensagem amigável:
+         - ""Esse lote já possui inscrições e não pode ser excluído. Considere apenas fechá-lo ou desativá-lo.""
+
+
+Parte 2 – Status do evento: expirado, publicado e relação com lotes
+-------------------------------------------------------------------
+
+Hoje:
+
+- A tela do cliente marca o evento como ""expirado"" quando não há lote válido (sem lote active).
+- Isso está correto como proteção.
+- Porém:
+  - Quando um lote volta a ser ativado no admin, o evento NÃO tem seu status ajustado.
+  - Publicar o evento manualmente não funciona bem, pois:
+    - Se não houver nenhum lote `active`, o evento é marcado como expirado novamente automaticamente.
+
+O que quero:
+
+1. Adicionar e usar corretamente o `status` do evento, com valores como:
+   - 'draft'     (rascunho)
+   - 'published' (publicado e visível)
+   - 'expired'   (expirado/sem lote válido ou encerrado)
+   - 'closed'    (encerrado manualmente após a realização do evento, por exemplo)
+
+2. Regras entre evento e lotes:
+
+   - Se o evento estiver `published`:
+     - mas NÃO houver nenhum lote com `status = 'active'`:
+       - a tela do cliente deve mostrar o evento como ""inscrições encerradas"" ou similar (expirado do ponto de vista de inscrição)
+       - MAS isso não deve alterar o `status` administrativo automaticamente para 'expired' sem critério.
+
+   - Se a lógica atual estiver alterando o `status` do evento para 'expired' SOMENTE com base nos lotes:
+     - Revisar isso.
+     - Idealmente:
+       - Use um campo separado para ""inscrições disponíveis"" vs ""publicação do evento"".
+       - Ou então:
+         - mantenha `published` como ""visível""
+         - e controle o fluxo de inscrição pela existência ou não de lote active.
+
+3. Ao ativar um lote em um evento que está `expired`:
+
+   - NÃO quero que o evento seja publicado automaticamente.
+   - Quero um fluxo assim:
+
+     - Admin ativa um lote em evento com status 'expired':
+       - backend detecta essa situação
+       - o frontend mostra um diálogo:
+         - ""Você ativou um lote em um evento expirado. Deseja publicar o evento para reabrir as inscrições?""
+       - Se o admin confirmar:
+         - atualizar `event.status = 'published'`
+       - Se o admin recusar:
+         - evento continua expirado, e o lote ativo não deve ser usado no frontend de inscrição.
+
+   - Ou seja:
+     - O evento só deve voltar a ser ""publicado"" se o admin conscientemente escolher isso.
+
+4. Fluxo de publicação:
+
+   - Ajustar o comportamento do botão ""Publicar evento"":
+     - Ao publicar:
+       - verificar se existe pelo menos um lote `status = 'active'`.
+       - Se não existir:
+         - dar alerta:
+           - ""Este evento não possui nenhum lote ativo. Ele será publicado, mas as inscrições aparecerão como indisponíveis até que um lote seja ativado.""
+         - ou, se preferir:
+           - bloquear publicação sem lote active, exigindo um lote active.
+
+
+Parte 3 – Integração com a tela do cliente
+------------------------------------------
+Na tela de evento do cliente (frontend):
+
+1. Se `event.status` ≠ 'published':
+   - Não permitir fluxo de inscrição
+   - Mostrar status de acordo (rascunho, fechado, etc.)
+
+2. Se `event.status = 'published'`:
+   - Checar lotes:
+     - Se houver lote `status = 'active'`:
+       - permitir inscrições
+       - exibir valor e info corretas
+     - Se NÃO houver lote `status = 'active'`:
+       - mostrar ""inscrições encerradas"", ""esgotado"" ou ""breve"" de acordo com a regra
+       - importante: NÃO transformar modalidades pagas em gratuitas em nenhum caso.
+
+Objetivo final deste prompt
+---------------------------
+Depois dessas mudanças:
+
+- A exclusão de lote funciona, mas é segura (não apaga lotes usados).
+- O status do evento não fica ""oscilando"" automaticamente de forma incoerente.
+- Ativar lote em evento expirado oferece opção de publicar o evento via confirmação.
+- O frontend do cliente respeita:
+  - status do evento
+  - status dos lotes
+  - sem permitir inscrições em estados ilegais.
+"

@@ -1,0 +1,76 @@
+"Contexto
+--------
+O sistema de cupons já está funcionando (incluindo criação em massa via /bulk), porém faltam melhorias essenciais no fluxo de CUPOM AVULSO (criação tradicional) e na EDIÇÃO de cupons existentes.
+
+Objetivo
+--------
+Completar a gestão de cupons com:
+1) edição de cupom com toggle ativar/desativar (is_active)
+2) criação avulsa permitindo escolher ativo/inativo
+3) criação avulsa com opção de gerar código automaticamente (e mostrar o código gerado)
+
+Não alterar regras já existentes e manter compatibilidade com backend atual. Atualizar documentação se existir seção de cupons no /docs/MODALIDADE_VOUCHER.md.
+
+
+========================================
+1) Edição de cupom: ativar/desativar (is_active)
+========================================
+
+Requisito:
+- Na listagem de cupons do evento, permitir editar um cupom existente.
+- Deve ser possível alterar:
+  - is_active (ativar / desativar)
+  - demais campos já suportados pela edição (se existirem: validade, limites, tipo de desconto, etc.)
+
+Implementação esperada:
+- UI:
+  - Adicionar ação “Editar” em cada cupom (modal ou página).
+  - Incluir um toggle/checkbox: “Cupom ativo?”
+  - Mostrar claramente o estado atual (Ativo/Inativo).
+
+- Backend:
+  - Usar o endpoint existente de update (PATCH /api/admin/events/:eventId/coupons/:couponId) se já existir.
+  - Garantir que `is_active` seja persistido corretamente.
+  - Se o backend não aceitar `is_active` hoje, ajustar schema/validação para aceitar.
+
+- UX:
+  - Ao desativar cupom:
+    - cupom não deve validar no fluxo de pagamento
+    - erro amigável do tipo: “Cupom inativo.”
+
+========================================
+2) Criação tradicional (avulsa) de cupom: escolher ativo/inativo
+========================================
+
+Problema atual:
+- No formulário de criação avulsa de cupom, não existe opção de definir se nasce ativo ou inativo.
+
+Correção:
+- Adicionar no formulário de criação avulsa:
+  - toggle/checkbox “Criar como ativo?”
+  - default recomendado: ativo = true (mas permitir false)
+- Enviar `is_active` no payload de criação.
+- Garantir que o backend salve esse campo.
+
+========================================
+3) Criação tradicional (avulsa): gerar código automaticamente
+========================================
+
+Requisito:
+- No formulário de criação avulsa (um cupom só), adicionar opção:
+  - “Gerar código automaticamente”
+- Comportamento:
+  - Se o usuário marcar essa opção:
+    - o frontend pode gerar o código no momento (client-side) OU solicitar ao backend
+    - o campo de código deve ser preenchido automaticamente e ficar visível
+    - permitir “copiar código” com um botão
+  - Se o usuário desmarcar:
+    - ele digita o código manualmente.
+
+Regras obrigatórias:
+- O código gerado deve ser:
+  - aleatório e não previsível
+  - único globalmente (não pode colidir com vouchers nem cupons)
+- Se houver colisão no backend (unique constraint), deve:
+  - gerar novamente e tentar salvar de novo (retry automático)
+  - nunca permitir"
