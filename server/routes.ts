@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const events = await storage.getEvents();
       // Show published, sold-out and finalized events
-      const publicEvents = events.filter(e => e.status === "publicado" || e.status === "esgotado" || e.status === "finalizado");
+      const publicEvents = events.filter(e => (e.status === "publicado" || e.status === "esgotado" || e.status === "finalizado") && e.visivel !== false);
       
       // Get banners for each event if bannerUrl is not set
       const eventsWithBanners = await Promise.all(

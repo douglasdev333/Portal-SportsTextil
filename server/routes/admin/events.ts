@@ -41,6 +41,7 @@ const eventSchema = z.object({
   informacoesRetiradaKit: z.string().optional().nullable(),
   idadeMinimaEvento: z.number().int().min(0, "Idade minima deve ser positiva").max(100, "Idade minima invalida").optional(),
   permitirMultiplasModalidades: z.boolean().optional(),
+  visivel: z.boolean().optional(),
   status: z.enum(["rascunho", "publicado", "cancelado", "finalizado", "esgotado"]).optional()
 });
 
@@ -186,7 +187,8 @@ router.post("/", requireAuth, requireRole("superadmin", "admin"), async (req, re
       entregaCamisaNoKit: validation.data.entregaCamisaNoKit ?? true,
       usarGradePorModalidade: validation.data.usarGradePorModalidade ?? false,
       informacoesRetiradaKit: validation.data.informacoesRetiradaKit ?? null,
-      idadeMinimaEvento: validation.data.idadeMinimaEvento ?? 18
+      idadeMinimaEvento: validation.data.idadeMinimaEvento ?? 18,
+      visivel: validation.data.visivel ?? true
     });
 
     res.status(201).json({ success: true, data: formatEventForResponse(event) });
@@ -345,6 +347,39 @@ router.patch("/:id/status", requireAuth, requireRole("superadmin", "admin"), asy
     res.json({ success: true, data: updated });
   } catch (error) {
     console.error("Update event status error:", error);
+    res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }
+    });
+  }
+});
+
+router.patch("/:id/visibilidade", requireAuth, requireRole("superadmin", "admin"), async (req, res) => {
+  try {
+    const event = await storage.getEvent(req.params.id);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "Evento nao encontrado" }
+      });
+    }
+
+    const schema = z.object({
+      visivel: z.boolean()
+    });
+
+    const validation = schema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Valor de visibilidade invalido" }
+      });
+    }
+
+    const updated = await storage.updateEvent(req.params.id, { visivel: validation.data.visivel });
+    res.json({ success: true, data: formatEventForResponse(updated) });
+  } catch (error) {
+    console.error("Update event visibility error:", error);
     res.status(500).json({
       success: false,
       error: { code: "INTERNAL_ERROR", message: "Erro interno do servidor" }

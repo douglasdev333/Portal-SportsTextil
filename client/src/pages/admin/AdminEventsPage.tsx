@@ -28,7 +28,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, MoreHorizontal, Pencil, Users, Settings, ShoppingCart, Ticket } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Search, MoreHorizontal, Pencil, Users, Settings, ShoppingCart, Ticket, Eye, EyeOff } from "lucide-react";
 import { formatDateOnlyBrazil } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -74,6 +76,26 @@ export default function AdminEventsPage() {
       toast({
         title: "Erro ao atualizar status",
         description: error?.message || "Não foi possível alterar o status do evento.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleVisibilityMutation = useMutation({
+    mutationFn: async ({ eventId, visivel }: { eventId: string; visivel: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/events/${eventId}/visibilidade`, { visivel });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      toast({
+        title: "Visibilidade atualizada",
+        description: "A visibilidade do evento foi alterada com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar visibilidade",
+        description: error?.message || "Não foi possível alterar a visibilidade do evento.",
         variant: "destructive",
       });
     },
@@ -163,6 +185,7 @@ export default function AdminEventsPage() {
                     <TableHead>Data</TableHead>
                     <TableHead>Vagas</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-center">Visível</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -229,6 +252,33 @@ export default function AdminEventsPage() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center gap-2">
+                                <Switch
+                                  checked={event.visivel !== false}
+                                  onCheckedChange={(checked) => {
+                                    toggleVisibilityMutation.mutate({ eventId: event.id, visivel: checked });
+                                  }}
+                                  disabled={toggleVisibilityMutation.isPending}
+                                />
+                                {event.visivel !== false ? (
+                                  <Eye className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {event.visivel !== false
+                                ? "Evento visível no portal. Clique para ocultar."
+                                : "Evento oculto do portal. Acessível apenas pelo link direto."}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">

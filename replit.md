@@ -24,6 +24,7 @@ Preferred communication style: Simple, everyday language.
 - **Business Rules:** Mandatory event capacity (`limiteVagasTotal`), optional modality capacity (`limiteVagas`), order-based checkout supporting multiple registrations, payment at order level, batch auto-switching, and atomic shirt inventory decrement.
 - **Batch Status System:** Registration batches use `status` field ('active'/'closed'/'future') for business logic and `ativo` boolean for visibility. Only one batch can have status='active' per event. Status changes are enforced through dedicated routes (/activate, /close, /set-future), not the generic PATCH endpoint. See `docs/lotes-status-e-visibilidade.md` for details.
 - **Batch Deletion:** Batches with registrations (quantidadeUtilizada > 0) cannot be deleted. The API returns BATCH_HAS_REGISTRATIONS error code with a user-friendly message suggesting to close or deactivate instead.
+- **Event Visibility:** Events have a `visivel` boolean field (default: true). When set to false, the event is hidden from public listing pages (homepage, event search) but remains accessible via its direct slug URL. Admin panel has a toggle switch to control visibility independently of event status.
 - **Event Publishing:** When activating a batch in a non-published event, the API returns eventNeedsPublish flag. The admin UI shows a dialog asking if the user wants to publish the event along with activating the batch.
 - **Development Infrastructure:** In-memory storage fallback for development, HMR via Vite, separate build outputs for client and server.
 

@@ -71,6 +71,7 @@ export const events = pgTable("events", {
   imagemPercursoUrl: text("imagem_percurso_url"),
   idadeMinimaEvento: integer("idade_minima_evento").default(18).notNull(),
   permitirMultiplasModalidades: boolean("permitir_multiplas_modalidades").default(false).notNull(),
+  visivel: boolean("visivel").default(true).notNull(),
   dataCriacao: timestamp("data_criacao", { withTimezone: true }).defaultNow().notNull(),
 });
 
