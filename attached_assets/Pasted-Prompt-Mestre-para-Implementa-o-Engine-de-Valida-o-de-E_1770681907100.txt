@@ -1,0 +1,263 @@
+Prompt Mestre para Implementação: Engine de Validação de Elegibilidade (Node.js)
+
+Instrução para a LLM:
+Você é um Desenvolvedor Backend Senior especializado em Node.js e arquitetura de sistemas escaláveis. Sua tarefa é implementar e integrar uma Engine de Regras de Elegibilidade para um portal de inscrições. Esta engine deve ser capaz de consumir uma API REST externa de pacientes e se integrar ao fluxo de inscrição existente. O objetivo é que você forneça o código pronto para ser inserido ou adaptado diretamente em um projeto Node.js/Express.
+
+
+
+
+1. Contexto do Projeto e Fluxo de Inscrição Existente
+
+O sistema de inscrições opera com modalidades que possuem diferentes Tipos de Acesso (pago, gratuito, voucher, aprovação manual). A validação via API REST não substitui esses tipos, mas atua como uma regra adicional de elegibilidade.
+
+Fluxo de Inscrição Atual (Simplificado):
+
+1.
+Atleta Seleciona Modalidade: O usuário escolhe uma modalidade de inscrição no frontend.
+
+2.
+Requisição de Inscrição (Frontend -> Backend): O frontend envia os dados do atleta (incluindo CPF) e a modalidade escolhida para um endpoint de inscrição no backend (ex: /api/register).
+
+3.
+Backend Carrega Regras: O backend, ao receber a requisição, carrega as regras de elegibilidade configuradas para a modalidade selecionada (estas regras são armazenadas no banco de dados e incluem a configuração da API externa).
+
+4.
+Processamento das Regras: Para cada regra carregada, o backend a executa.
+
+•
+PONTO DE INSERÇÃO: Aqui é onde a validação da API externa de pacientes deve ser executada.
+
+
+
+5.
+Avaliação da Elegibilidade: Se qualquer regra falhar (incluindo a validação da API externa), a inscrição é bloqueada.
+
+6.
+Continuação do Fluxo: Se todas as regras passarem, o backend prossegue com o fluxo do tipo de acesso da modalidade (ex: redireciona para pagamento, registra como gratuito, etc.).
+
+7.
+Resposta ao Frontend: O backend retorna uma resposta indicando sucesso ou falha na inscrição, com mensagens apropriadas.
+
+2. Especificações da API Externa (Pacientes)
+
+Esta é a API que a engine de elegibilidade irá consumir:
+
+•
+Endpoint de Exemplo: https://api.exemplo.com/buscar/pacientes/busca/{cpf}
+
+•
+Método: GET
+
+•
+Parâmetro Dinâmico: {cpf} (será substituído pelo CPF do atleta )
+
+Comportamento de Retorno:
+
+•
+Sucesso (Paciente Encontrado):
+
+•
+Status HTTP: 200 OK
+
+•
+Corpo JSON (Exemplo):
+
+JSON
+
+
+{
+  "nome": "Fulano de Tal",
+  "cpf": "999.999.999-99",
+  "telefone": "(31) 9 9999-999",
+  "dataNascimento": "2000-02-26",
+  "sexo": "Masculino",
+  "tipoServidor": "PM - Polícia Militar"
+}
+
+
+
+
+
+•
+Significado: O paciente é ELEGÍVEL.
+
+
+
+•
+Falha (Paciente Não Encontrado):
+
+•
+Status HTTP: 404 Not Found
+
+•
+Corpo JSON (Exemplo):
+
+JSON
+
+
+{
+  "Error": "paciente nao encontrado"
+}
+
+
+
+
+
+•
+Significado: O paciente é INELEGÍVEL. Esta deve ser tratada como uma regra de negócio falha, não um erro de sistema.
+
+
+
+•
+Outros Erros (Ex: 500 Internal Server Error, Timeout):
+
+•
+Devem ser tratados conforme a configuração on_error da regra (ver abaixo).
+
+
+
+3. Estrutura da Regra de API (JSON de Exemplo)
+
+Esta é a estrutura que o backend receberá para configurar a validação da API de pacientes:
+
+JSON
+
+
+{
+  "type": "api_rest",
+  "request": {
+    "url": "https://api.exemplo.com/buscar/pacientes/busca/{cpf}",
+    "method": "GET",
+    "params": ["cpf"], // Parâmetros a serem substituídos na URL
+    "timeout_ms": 3000 // Timeout em milissegundos
+  },
+  "validation": {
+    "mode": "http_status", // Modo de validação: http_status ou json_compare
+    "allowed_status": [200] // Status HTTP que indicam sucesso na validação
+  },
+  "on_error": "block", // Comportamento em caso de falha da API (ex: timeout, 500 ): "block" ou "allow"
+  "error_message": "Inscrição não permitida: Paciente não encontrado na base de dados oficial." // Mensagem personalizada para o usuário
+}
+
+
+
+4. Requisitos de Implementação (Node.js Backend)
+
+Você deve fornecer o código para as seguintes funções e sua integração, utilizando axios para requisições HTTP e priorizando ES Modules. O código deve ser modular e fácil de integrar em um projeto Express existente.
+
+A. Funções Essenciais:
+
+1.
+sanitizeUrl(baseUrl: string, params: Record<string, string>): string
+
+•
+Propósito: Substituir placeholders na baseUrl (ex: {cpf}) pelos valores correspondentes em params, garantindo que os valores sejam codificados para URL (encodeURIComponent).
+
+•
+Exemplo: sanitizeUrl( "https://api.exemplo.com/user/{id}", { id: "123" } ) deve retornar "https://api.exemplo.com/user/123".
+
+
+
+2.
+validateExternalApi(ruleConfig: RuleConfig, athleteData: AthleteData ): Promise<{ ok: boolean; message?: string }>
+
+•
+Propósito: Executar a chamada HTTP para a API externa com base na ruleConfig e athleteData, e avaliar a resposta.
+
+•
+Dependências: Deve usar axios.
+
+•
+Parâmetros:
+
+•
+ruleConfig: O objeto JSON da regra de API (conforme seção 3).
+
+•
+athleteData: Um objeto contendo os dados do atleta (ex: { cpf: "123.456.789-00", nome: "Fulano" }).
+
+
+
+•
+Lógica Interna:
+
+•
+Construir a URL final usando sanitizeUrl.
+
+•
+Realizar a requisição axios com o method, headers e timeout_ms definidos em ruleConfig.request.
+
+•
+Tratamento de 404: Se a API retornar 404 Not Found, a função deve retornar { ok: false, message: ruleConfig.error_message } imediatamente, sem considerar on_error.
+
+•
+Validação http_status: Se ruleConfig.validation.mode for http_status, verificar se o response.status está incluído em ruleConfig.validation.allowed_status.
+
+•
+Validação json_compare (simplificado para este prompt ): Se ruleConfig.validation.mode for json_compare, e o path for 'apto' e o value for true, verificar se response.data.apto === true. Para outros casos de json_compare, a LLM pode usar uma lógica genérica de comparação ou indicar um placeholder.
+
+•
+Tratamento de Erros de Rede/Timeout: Em caso de axios.isAxiosError (timeout, erro de conexão, 500s), aplicar a lógica de ruleConfig.on_error:
+
+•
+Se on_error === 'block', retornar { ok: false, message: ruleConfig.error_message || 'Erro inesperado na validação externa.' }.
+
+•
+Se on_error === 'allow', retornar { ok: true, message: 'Validação externa temporariamente indisponível, inscrição permitida.' }.
+
+
+
+•
+Log: Erros devem ser logados, mas sem expor o CPF completo.
+
+
+
+
+
+3.
+executeEligibilityCheck(registrationData: { athleteData: AthleteData; modalityRules: RuleConfig[] }): Promise<{ eligible: boolean; messages: string[] }>
+
+•
+Propósito: Orquestrar a execução de múltiplas regras de elegibilidade para um atleta e modalidade.
+
+•
+Lógica Interna:
+
+•
+Iterar sobre modalityRules.
+
+•
+Se uma regra for do type: 'api_rest', chamar validateExternalApi.
+
+•
+Coletar todas as mensagens de erro.
+
+•
+Retornar eligible: false e as messages se qualquer regra falhar; caso contrário, retornar eligible: true.
+
+
+
+
+
+B. Boas Práticas e Segurança:
+
+•
+Variáveis de Ambiente: A URL base da API externa e quaisquer chaves de API devem ser carregadas de variáveis de ambiente (process.env).
+
+•
+Log Seguro: Implementar um logger que mascare dados sensíveis (como CPF) antes de registrar em produção.
+
+•
+Tratamento de Erros Robusto: Utilizar try/catch de forma abrangente para lidar com falhas de rede, timeouts e respostas inesperadas da API externa.
+
+•
+Modularidade: Organizar o código em arquivos separados (ex: utils/urlSanitizer.js, services/eligibilityService.js, controllers/registrationController.js).
+
+5. Exemplo de Integração (Express.js)
+
+Forneça um exemplo de como a função executeEligibilityCheck seria integrada em uma rota Express para processar uma requisição de inscrição. Inclua como carregar as modalityRules (simulando um banco de dados) e como retornar a resposta ao frontend.
+
+6. Saída Esperada
+
+O resultado deve ser o código completo das funções e o exemplo de integração, com comentários claros explicando cada parte e as decisões de segurança tomadas. O código deve ser funcional e pronto para ser testado em um ambiente Node.js.
+
