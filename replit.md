@@ -133,7 +133,10 @@ Configurable rule engine that validates athlete eligibility via external APIs be
 - **Validation Flow**: Runs after age validation and before price calculation in `POST /api/registrations`. If any rule fails, returns 403 with `ELIGIBILITY_CHECK_FAILED` error code
 - **API Validation Modes**: `http_status` (checks response status code) and `json_compare` (checks a specific JSON field value)
 - **Error Handling**: 404 = ineligible (business rule), 500/timeout = applies `on_error` config (`block` or `allow`)
-- **Admin UI**: Collapsible "Validação de Elegibilidade" section in modality create/edit modal with fields for URL, method, timeout, validation mode, error behavior, and custom error message
+- **Authentication**: Supports 4 auth modes: none, API Key (Header), API Key (Query String), Bearer Token. Auth is configured per rule with `key_name` and `key_value` fields. The `applyAuth()` function injects credentials into headers or URL as appropriate
+- **POST Support**: When method is POST, athlete params (cpf, etc.) are sent as JSON body with Content-Type header
+- **Admin UI**: Collapsible "Validação de Elegibilidade" section in modality create/edit modal with fields for URL, method, timeout, auth type/key, validation mode, error behavior, and custom error message
 - **Frontend Feedback**: `ELIGIBILITY_CHECK_FAILED` error passes through the admin-configured custom message directly to the athlete
-- **Security**: CPF is masked in all logs via `maskCpf()`. Uses native `fetch` with `AbortController` for timeout support
+- **Security**: CPF is masked in all logs via `maskCpf()`. Uses native `fetch` with `AbortController` for timeout support. API keys stored in JSONB (acceptable for prototype, should be encrypted for production)
+- **Mock API**: `server/routes/mock-eligibility.ts` provides test endpoints at `/api/mock-eligibility/pacientes/:cpf` (GET) and `/api/mock-eligibility/validar` (POST). Uses local JSON data (`server/data/mock-eligibility.json`) with 5 test athletes. Auth key: `test-key-2026`
 - **Documentation**: Full implementation plan in `docs/PLANO_ENGINE_VALIDACAO_ELEGIBILIDADE.md`

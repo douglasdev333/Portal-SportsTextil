@@ -27,6 +27,7 @@ import webhooksRoutes from "./routes/webhooks";
 import receiptsRoutes from "./routes/receipts";
 import publicVouchersRoutes from "./routes/vouchers";
 import publicCouponsRoutes from "./routes/coupons";
+import mockEligibilityRoutes from "./routes/mock-eligibility";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
@@ -53,6 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/receipts", receiptsRoutes);
   app.use("/api/vouchers", publicVouchersRoutes);
   app.use("/api/coupons", publicCouponsRoutes);
+  app.use("/api/mock-eligibility", mockEligibilityRoutes);
 
   function formatEventForResponse(event: any) {
     return {

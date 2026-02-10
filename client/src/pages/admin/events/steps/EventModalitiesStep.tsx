@@ -57,6 +57,11 @@ const defaultEligibilityRule = {
     method: "GET" as const,
     params: ["cpf"],
     timeout_ms: 3000,
+    auth: {
+      type: "none" as const,
+      key_name: "",
+      key_value: "",
+    },
   },
   validation: {
     mode: "http_status" as const,
@@ -552,6 +557,11 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
                   updateRule({ request: { ...rule.request, ...updates } });
                 };
 
+                const updateRuleAuth = (updates: Partial<NonNullable<typeof rule.request.auth>>) => {
+                  const currentAuth = rule.request.auth || { type: "none" as const, key_name: "", key_value: "" };
+                  updateRuleRequest({ auth: { ...currentAuth, ...updates } });
+                };
+
                 const updateRuleValidation = (updates: Partial<typeof rule.validation>) => {
                   updateRule({ validation: { ...rule.validation, ...updates } });
                 };
@@ -630,6 +640,58 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
                             />
                           </div>
                         </div>
+
+                        <div className="space-y-2">
+                          <Label>Autenticação</Label>
+                          <Select
+                            value={rule.request.auth?.type || "none"}
+                            onValueChange={(value: "none" | "api_key_header" | "api_key_query" | "bearer_token") => {
+                              updateRuleAuth({ type: value });
+                            }}
+                          >
+                            <SelectTrigger data-testid="select-eligibility-auth-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sem autenticação</SelectItem>
+                              <SelectItem value="api_key_header">API Key (Header)</SelectItem>
+                              <SelectItem value="api_key_query">API Key (Query String)</SelectItem>
+                              <SelectItem value="bearer_token">Bearer Token</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {rule.request.auth?.type && rule.request.auth.type !== "none" && (
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {rule.request.auth.type !== "bearer_token" && (
+                              <div className="space-y-2">
+                                <Label htmlFor="eligibility-auth-key-name">
+                                  {rule.request.auth.type === "api_key_header" ? "Nome do Header" : "Nome do Parâmetro"}
+                                </Label>
+                                <Input
+                                  id="eligibility-auth-key-name"
+                                  value={rule.request.auth.key_name || ""}
+                                  onChange={(e) => updateRuleAuth({ key_name: e.target.value })}
+                                  placeholder={rule.request.auth.type === "api_key_header" ? "X-API-Key" : "api_key"}
+                                  data-testid="input-eligibility-auth-key-name"
+                                />
+                              </div>
+                            )}
+                            <div className="space-y-2">
+                              <Label htmlFor="eligibility-auth-key-value">
+                                {rule.request.auth.type === "bearer_token" ? "Token" : "Chave"}
+                              </Label>
+                              <Input
+                                id="eligibility-auth-key-value"
+                                type="password"
+                                value={rule.request.auth.key_value || ""}
+                                onChange={(e) => updateRuleAuth({ key_value: e.target.value })}
+                                placeholder="••••••••"
+                                data-testid="input-eligibility-auth-key-value"
+                              />
+                            </div>
+                          </div>
+                        )}
 
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">

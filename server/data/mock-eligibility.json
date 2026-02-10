@@ -1,0 +1,39 @@
+{
+  "athletes": [
+    {
+      "cpf": "12345678901",
+      "nome": "Maria Silva",
+      "apto": true,
+      "categoria": "elite",
+      "observacao": "Atleta registrada e apta"
+    },
+    {
+      "cpf": "98765432100",
+      "nome": "João Santos",
+      "apto": true,
+      "categoria": "amador",
+      "observacao": "Atleta registrado e apto"
+    },
+    {
+      "cpf": "11122233344",
+      "nome": "Ana Oliveira",
+      "apto": false,
+      "categoria": "amador",
+      "observacao": "Exame médico vencido"
+    },
+    {
+      "cpf": "55566677788",
+      "nome": "Carlos Ferreira",
+      "apto": true,
+      "categoria": "elite",
+      "observacao": "Atleta federado"
+    },
+    {
+      "cpf": "99988877766",
+      "nome": "Paula Costa",
+      "apto": false,
+      "categoria": "amador",
+      "observacao": "Pendência cadastral"
+    }
+  ]
+}

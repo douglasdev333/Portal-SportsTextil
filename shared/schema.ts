@@ -13,12 +13,19 @@ export const batchStatusEnum = pgEnum("batch_status", ["active", "closed", "futu
 export const statusEntityTypeEnum = pgEnum("status_entity_type", ["event", "order", "registration"]);
 export const statusChangedByTypeEnum = pgEnum("status_changed_by_type", ["system", "admin", "athlete"]);
 
+export interface EligibilityRuleAuth {
+  type: "none" | "api_key_header" | "api_key_query" | "bearer_token";
+  key_name?: string;
+  key_value?: string;
+}
+
 export interface EligibilityRuleRequest {
   url: string;
   method: "GET" | "POST";
   params: string[];
   headers?: Record<string, string>;
   timeout_ms: number;
+  auth?: EligibilityRuleAuth;
 }
 
 export interface EligibilityRuleValidation {

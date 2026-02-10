@@ -28,6 +28,47 @@ export function sanitizeUrl(baseUrl: string, params: Record<string, string>): st
   return url;
 }
 
+function applyAuth(
+  url: string,
+  headers: Record<string, string>,
+  auth?: EligibilityRule['request']['auth']
+): { url: string; headers: Record<string, string> } {
+  if (!auth || auth.type === 'none') {
+    return { url, headers };
+  }
+
+  const keyName = auth.key_name || '';
+  const keyValue = auth.key_value || '';
+
+  if (!keyValue) {
+    console.warn('[eligibility] Auth configurada mas key_value vazio, ignorando autenticação');
+    return { url, headers };
+  }
+
+  switch (auth.type) {
+    case 'api_key_header':
+      return {
+        url,
+        headers: { ...headers, [keyName || 'X-API-Key']: keyValue },
+      };
+    case 'api_key_query': {
+      const separator = url.includes('?') ? '&' : '?';
+      const paramName = keyName || 'api_key';
+      return {
+        url: `${url}${separator}${encodeURIComponent(paramName)}=${encodeURIComponent(keyValue)}`,
+        headers,
+      };
+    }
+    case 'bearer_token':
+      return {
+        url,
+        headers: { ...headers, 'Authorization': `Bearer ${keyValue}` },
+      };
+    default:
+      return { url, headers };
+  }
+}
+
 function getNestedValue(obj: any, path: string): any {
   return path.split('.').reduce((current, key) => {
     return current !== undefined && current !== null ? current[key] : undefined;
@@ -47,19 +88,29 @@ export async function validateExternalApi(
       }
     }
 
-    const finalUrl = sanitizeUrl(ruleConfig.request.url, paramValues);
+    const rawUrl = sanitizeUrl(ruleConfig.request.url, paramValues);
+
+    const baseHeaders: Record<string, string> = {
+      'Accept': 'application/json',
+      ...(ruleConfig.request.headers || {}),
+    };
+
+    const { url: finalUrl, headers: finalHeaders } = applyAuth(rawUrl, baseHeaders, ruleConfig.request.auth);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), ruleConfig.request.timeout_ms || 3000);
 
+    const method = ruleConfig.request.method || 'GET';
     const fetchOptions: RequestInit = {
-      method: ruleConfig.request.method || 'GET',
+      method,
       signal: controller.signal,
-      headers: {
-        'Accept': 'application/json',
-        ...(ruleConfig.request.headers || {}),
-      },
+      headers: finalHeaders,
     };
+
+    if (method === 'POST') {
+      (fetchOptions.headers as Record<string, string>)['Content-Type'] = 'application/json';
+      fetchOptions.body = JSON.stringify(paramValues);
+    }
 
     let response: Response;
     try {

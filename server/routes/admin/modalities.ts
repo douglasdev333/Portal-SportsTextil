@@ -36,6 +36,11 @@ const modalitySchema = z.object({
       params: z.array(z.string()),
       headers: z.record(z.string()).optional(),
       timeout_ms: z.number().int().min(500).max(30000).default(3000),
+      auth: z.object({
+        type: z.enum(["none", "api_key_header", "api_key_query", "bearer_token"]),
+        key_name: z.string().optional(),
+        key_value: z.string().optional(),
+      }).optional(),
     }),
     validation: z.object({
       mode: z.enum(["http_status", "json_compare"]),
