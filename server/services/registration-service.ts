@@ -47,6 +47,7 @@ export type RegistrationErrorCode =
   | 'ALREADY_REGISTERED'
   | 'NO_VALID_BATCH_FOR_PAID_MODALITY'
   | 'SHIRT_SIZE_SOLD_OUT'
+  | 'ELIGIBILITY_CHECK_FAILED'
   | 'INTERNAL_ERROR';
 
 export interface AtomicRegistrationResult {

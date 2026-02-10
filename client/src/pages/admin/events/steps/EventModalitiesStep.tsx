@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, GripVertical, Upload, X, ImageIcon, Loader2, DollarSign, Users, Clock, Link2, ExternalLink, EyeOff, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, GripVertical, Upload, X, ImageIcon, Loader2, DollarSign, Users, Clock, Link2, ExternalLink, EyeOff, ChevronUp, ChevronDown, Shield, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +46,24 @@ const emptyModality: ModalityFormData = {
   ordem: 0,
   linksPercurso: [],
   ativo: true,
+  regrasElegibilidade: [],
+};
+
+const defaultEligibilityRule = {
+  type: "api_rest" as const,
+  enabled: true,
+  request: {
+    url: "",
+    method: "GET" as const,
+    params: ["cpf"],
+    timeout_ms: 3000,
+  },
+  validation: {
+    mode: "http_status" as const,
+    allowed_status: [200],
+  },
+  on_error: "block" as const,
+  error_message: "",
 };
 
 export function EventModalitiesStep({ formData, updateFormData }: EventModalitiesStepProps) {
@@ -518,6 +536,220 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
                   )}
                 </div>
               </div>
+
+              {(() => {
+                const rules = currentModality.regrasElegibilidade || [];
+                const hasRule = rules.length > 0;
+                const rule = hasRule ? rules[0] : defaultEligibilityRule;
+                const isEnabled = hasRule && rule.enabled;
+
+                const updateRule = (updates: Partial<typeof rule>) => {
+                  const updatedRule = { ...rule, ...updates };
+                  updateCurrentModality("regrasElegibilidade", [updatedRule]);
+                };
+
+                const updateRuleRequest = (updates: Partial<typeof rule.request>) => {
+                  updateRule({ request: { ...rule.request, ...updates } });
+                };
+
+                const updateRuleValidation = (updates: Partial<typeof rule.validation>) => {
+                  updateRule({ validation: { ...rule.validation, ...updates } });
+                };
+
+                return (
+                  <div className="space-y-3 p-4 rounded-lg border bg-muted/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-base font-medium">Validação de Elegibilidade</Label>
+                      </div>
+                      <Switch
+                        checked={isEnabled}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            const newRule = hasRule ? { ...rule, enabled: true } : { ...defaultEligibilityRule, enabled: true };
+                            updateCurrentModality("regrasElegibilidade", [newRule]);
+                          } else {
+                            if (hasRule) {
+                              updateRule({ enabled: false });
+                            } else {
+                              updateCurrentModality("regrasElegibilidade", []);
+                            }
+                          }
+                        }}
+                        data-testid="switch-eligibility-enabled"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Valida o atleta em uma API externa antes de permitir a inscrição
+                    </p>
+
+                    {isEnabled && (
+                      <div className="space-y-4 pt-2 border-t">
+                        <div className="space-y-2">
+                          <Label htmlFor="eligibility-url">URL da API *</Label>
+                          <Input
+                            id="eligibility-url"
+                            value={rule.request.url}
+                            onChange={(e) => updateRuleRequest({ url: e.target.value })}
+                            placeholder="https://api.exemplo.com/pacientes/{cpf}"
+                            data-testid="input-eligibility-url"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Use <code className="bg-muted px-1 rounded">{'{cpf}'}</code> onde o CPF do atleta será inserido
+                          </p>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Método HTTP</Label>
+                            <Select
+                              value={rule.request.method}
+                              onValueChange={(value: "GET" | "POST") => updateRuleRequest({ method: value })}
+                            >
+                              <SelectTrigger data-testid="select-eligibility-method">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="GET">GET</SelectItem>
+                                <SelectItem value="POST">POST</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="eligibility-timeout">Timeout (ms)</Label>
+                            <Input
+                              id="eligibility-timeout"
+                              type="number"
+                              min="500"
+                              max="30000"
+                              value={rule.request.timeout_ms}
+                              onChange={(e) => updateRuleRequest({ timeout_ms: parseInt(e.target.value) || 3000 })}
+                              data-testid="input-eligibility-timeout"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Modo de Validação</Label>
+                            <Select
+                              value={rule.validation.mode}
+                              onValueChange={(value: "http_status" | "json_compare") => {
+                                if (value === "http_status") {
+                                  updateRuleValidation({ mode: value, allowed_status: [200] });
+                                } else {
+                                  updateRuleValidation({ mode: value, path: "", value: true });
+                                }
+                              }}
+                            >
+                              <SelectTrigger data-testid="select-eligibility-validation-mode">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="http_status">Status HTTP</SelectItem>
+                                <SelectItem value="json_compare">Comparação JSON</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {rule.validation.mode === "http_status" && (
+                            <div className="space-y-2">
+                              <Label htmlFor="eligibility-status">Status aceitos</Label>
+                              <Input
+                                id="eligibility-status"
+                                value={(rule.validation.allowed_status || [200]).join(", ")}
+                                onChange={(e) => {
+                                  const statuses = e.target.value
+                                    .split(",")
+                                    .map(s => parseInt(s.trim()))
+                                    .filter(n => !isNaN(n));
+                                  updateRuleValidation({ allowed_status: statuses.length > 0 ? statuses : [200] });
+                                }}
+                                placeholder="200"
+                                data-testid="input-eligibility-status"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Separe múltiplos status com vírgula
+                              </p>
+                            </div>
+                          )}
+
+                          {rule.validation.mode === "json_compare" && (
+                            <>
+                              <div className="space-y-2">
+                                <Label htmlFor="eligibility-json-path">Campo JSON</Label>
+                                <Input
+                                  id="eligibility-json-path"
+                                  value={rule.validation.path || ""}
+                                  onChange={(e) => updateRuleValidation({ path: e.target.value })}
+                                  placeholder="Ex: apto"
+                                  data-testid="input-eligibility-json-path"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {rule.validation.mode === "json_compare" && (
+                          <div className="space-y-2">
+                            <Label htmlFor="eligibility-json-value">Valor esperado</Label>
+                            <Input
+                              id="eligibility-json-value"
+                              value={String(rule.validation.value ?? "")}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                let parsed: any = val;
+                                if (val === "true") parsed = true;
+                                else if (val === "false") parsed = false;
+                                else if (!isNaN(Number(val)) && val !== "") parsed = Number(val);
+                                updateRuleValidation({ value: parsed });
+                              }}
+                              placeholder="Ex: true"
+                              data-testid="input-eligibility-json-value"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Use true, false, ou um número/texto
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label>Se a API falhar (timeout/erro)</Label>
+                          <Select
+                            value={rule.on_error}
+                            onValueChange={(value: "block" | "allow") => updateRule({ on_error: value })}
+                          >
+                            <SelectTrigger data-testid="select-eligibility-on-error">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="block">Bloquear inscrição</SelectItem>
+                              <SelectItem value="allow">Permitir inscrição</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Define o comportamento quando a API externa está fora do ar
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="eligibility-error-msg">Mensagem de erro personalizada *</Label>
+                          <Textarea
+                            id="eligibility-error-msg"
+                            value={rule.error_message}
+                            onChange={(e) => updateRule({ error_message: e.target.value })}
+                            placeholder="Ex: Inscrição não permitida: cadastro não encontrado na base de dados."
+                            rows={2}
+                            data-testid="input-eligibility-error-message"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                 <div className="space-y-0.5">

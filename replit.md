@@ -124,3 +124,16 @@ Comprehensive reports with financial details and export capabilities:
 - **Totals Row**: Both reports include a totals row at the end calculated from confirmed/paid records only
 - **NaN Protection**: safeNumber() helper prevents NaN in legacy data with null/empty numeric fields
 - **Portuguese Accents**: All user-facing text properly accented (inscrição, alteração, histórico, Cartão de Crédito, etc.)
+
+### Eligibility Validation Engine (February 2026)
+Configurable rule engine that validates athlete eligibility via external APIs before allowing registration:
+
+- **Schema**: `regrasElegibilidade` JSONB field on `modalities` table stores an array of `EligibilityRule` objects
+- **Service**: `server/services/eligibility-service.ts` with `sanitizeUrl()`, `validateExternalApi()`, and `executeEligibilityCheck()` functions
+- **Validation Flow**: Runs after age validation and before price calculation in `POST /api/registrations`. If any rule fails, returns 403 with `ELIGIBILITY_CHECK_FAILED` error code
+- **API Validation Modes**: `http_status` (checks response status code) and `json_compare` (checks a specific JSON field value)
+- **Error Handling**: 404 = ineligible (business rule), 500/timeout = applies `on_error` config (`block` or `allow`)
+- **Admin UI**: Collapsible "Validação de Elegibilidade" section in modality create/edit modal with fields for URL, method, timeout, validation mode, error behavior, and custom error message
+- **Frontend Feedback**: `ELIGIBILITY_CHECK_FAILED` error passes through the admin-configured custom message directly to the athlete
+- **Security**: CPF is masked in all logs via `maskCpf()`. Uses native `fetch` with `AbortController` for timeout support
+- **Documentation**: Full implementation plan in `docs/PLANO_ENGINE_VALIDACAO_ELEGIBILIDADE.md`

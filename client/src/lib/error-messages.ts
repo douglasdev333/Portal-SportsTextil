@@ -58,7 +58,10 @@ export function getFriendlyErrorMessage(
   errorCode?: string, 
   statusDetail?: string
 ): string {
-  // Verificar código de erro específico primeiro
+  if (errorCode === "ELIGIBILITY_CHECK_FAILED" && error) {
+    return error;
+  }
+
   if (errorCode && registrationErrors[errorCode]) {
     return registrationErrors[errorCode];
   }

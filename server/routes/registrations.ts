@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { z } from "zod";
 import { registerForEventAtomic } from "../services/registration-service";
 import { checkEventCanAcceptRegistrations, recalculateBatchesForEvent, getModalitiesAvailability } from "../services/batch-validation-service";
+import { executeEligibilityCheck } from "../services/eligibility-service";
 import { formatBrazilDateTime, utcToBrazilLocal } from "../utils/timezone";
 
 const router = Router();
@@ -473,6 +474,28 @@ router.post("/", async (req, res) => {
             idadeAtleta,
             origem
           }
+        });
+      }
+    }
+
+    if (modality.regrasElegibilidade && Array.isArray(modality.regrasElegibilidade) && modality.regrasElegibilidade.length > 0) {
+      const eligibilityResult = await executeEligibilityCheck(
+        {
+          cpf: athlete.cpf,
+          nome: athlete.nome,
+          email: athlete.email || '',
+          dataNascimento: athlete.dataNascimento,
+          sexo: athlete.sexo
+        },
+        modality.regrasElegibilidade
+      );
+
+      if (!eligibilityResult.eligible) {
+        return res.status(403).json({
+          success: false,
+          error: eligibilityResult.messages[0] || "Atleta não elegível para esta modalidade.",
+          errorCode: "ELIGIBILITY_CHECK_FAILED",
+          details: { messages: eligibilityResult.messages }
         });
       }
     }

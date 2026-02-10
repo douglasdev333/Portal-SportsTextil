@@ -27,6 +27,25 @@ const modalitySchema = z.object({
   tipoAcesso: z.enum(["gratuita", "paga", "voucher", "pcd", "aprovacao_manual"]).optional(),
   taxaComodidade: z.string().optional(),
   idadeMinima: z.number().int().min(0).max(100).optional().nullable(),
+  regrasElegibilidade: z.array(z.object({
+    type: z.literal("api_rest"),
+    enabled: z.boolean(),
+    request: z.object({
+      url: z.string(),
+      method: z.enum(["GET", "POST"]),
+      params: z.array(z.string()),
+      headers: z.record(z.string()).optional(),
+      timeout_ms: z.number().int().min(500).max(30000).default(3000),
+    }),
+    validation: z.object({
+      mode: z.enum(["http_status", "json_compare"]),
+      allowed_status: z.array(z.number().int()).optional(),
+      path: z.string().optional(),
+      value: z.any().optional(),
+    }),
+    on_error: z.enum(["block", "allow"]),
+    error_message: z.string(),
+  })).optional().nullable(),
   ordem: z.number().int().optional(),
   ativo: z.boolean().optional()
 });

@@ -13,6 +13,30 @@ export const batchStatusEnum = pgEnum("batch_status", ["active", "closed", "futu
 export const statusEntityTypeEnum = pgEnum("status_entity_type", ["event", "order", "registration"]);
 export const statusChangedByTypeEnum = pgEnum("status_changed_by_type", ["system", "admin", "athlete"]);
 
+export interface EligibilityRuleRequest {
+  url: string;
+  method: "GET" | "POST";
+  params: string[];
+  headers?: Record<string, string>;
+  timeout_ms: number;
+}
+
+export interface EligibilityRuleValidation {
+  mode: "http_status" | "json_compare";
+  allowed_status?: number[];
+  path?: string;
+  value?: any;
+}
+
+export interface EligibilityRule {
+  type: "api_rest";
+  enabled: boolean;
+  request: EligibilityRuleRequest;
+  validation: EligibilityRuleValidation;
+  on_error: "block" | "allow";
+  error_message: string;
+}
+
 export const organizers = pgTable("organizers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nome: text("nome").notNull(),
@@ -91,6 +115,7 @@ export const modalities = pgTable("modalities", {
   tipoAcesso: modalityAccessEnum("tipo_acesso").default("paga").notNull(),
   taxaComodidade: decimal("taxa_comodidade", { precision: 10, scale: 2 }).default("0").notNull(),
   idadeMinima: integer("idade_minima"),
+  regrasElegibilidade: jsonb("regras_elegibilidade").$type<EligibilityRule[]>(),
   ordem: integer("ordem").default(0).notNull(),
   ativo: boolean("ativo").default(true).notNull(),
 });
