@@ -80,6 +80,7 @@ interface EnrichedRegistration {
   orderId: string;
   numeroPedido: number | null;
   orderRegistrationsCount: number;
+  dadosElegibilidade: Record<string, any> | null;
 }
 
 interface Event {
@@ -274,6 +275,19 @@ export default function OrganizerEventInscritosPage() {
       dataToExport = registrations.filter(r => r.status === "cancelada");
     }
 
+    const eligibilityKeys: string[] = [];
+    const seenKeys = new Set<string>();
+    dataToExport.forEach((reg) => {
+      if (reg.dadosElegibilidade && typeof reg.dadosElegibilidade === 'object') {
+        Object.keys(reg.dadosElegibilidade).forEach((key) => {
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            eligibilityKeys.push(key);
+          }
+        });
+      }
+    });
+
     const headers = [
       "Nº Inscrição",
       "Nº Pedido",
@@ -298,21 +312,25 @@ export default function OrganizerEventInscritosPage() {
       "Status Pedido",
       "Data Inscrição",
       "Data Pagamento",
+      ...eligibilityKeys.map(k => `Elegibilidade: ${k}`),
     ];
 
     const rows = dataToExport.map((reg) => {
       const valorUnitario = parseFloat(reg.valorUnitario);
       const taxaComodidade = parseFloat(reg.taxaComodidade);
       const valorDesconto = parseFloat(reg.valorDesconto) / (reg.orderRegistrationsCount || 1);
-      // Valor bruto = valor unitário + taxa (total arrecadado)
       const valorBruto = valorUnitario + taxaComodidade;
-      // Valor líquido = valor unitário - desconto (valor para o organizador)
       const valorLiquido = valorUnitario - valorDesconto;
       const totalPago = valorUnitario - valorDesconto + taxaComodidade;
       const isGratuito = totalPago === 0;
       const formaPagamento = isGratuito ? "Cortesia" : (metodoPagamentoLabels[reg.metodoPagamento || ""] || reg.metodoPagamento || "-");
       const codigoDesconto = reg.codigoCupom || reg.codigoVoucher || "";
       
+      const eligibilityValues = eligibilityKeys.map(key => {
+        const val = reg.dadosElegibilidade?.[key];
+        return val != null ? String(val) : "";
+      });
+
       return [
         reg.numeroInscricao,
         reg.numeroPedido || "",
@@ -337,21 +355,18 @@ export default function OrganizerEventInscritosPage() {
         orderStatusLabels[reg.orderStatus] || reg.orderStatus,
         formatDateOnlyBrazil(reg.dataInscricao),
         reg.dataPagamento ? formatDateOnlyBrazil(reg.dataPagamento) : "-",
+        ...eligibilityValues,
       ];
     });
 
-    // Calcular totais apenas de inscrições confirmadas
     const confirmedRegs = dataToExport.filter(r => r.status === "confirmada");
     const totalValorUnitario = confirmedRegs.reduce((sum, r) => sum + parseFloat(r.valorUnitario), 0);
     const totalTaxa = confirmedRegs.reduce((sum, r) => sum + parseFloat(r.taxaComodidade), 0);
     const totalDesconto = confirmedRegs.reduce((sum, r) => sum + (parseFloat(r.valorDesconto) / (r.orderRegistrationsCount || 1)), 0);
-    // Valor bruto = valor unitário + taxa (total arrecadado)
     const totalBruto = totalValorUnitario + totalTaxa;
-    // Valor líquido = valor unitário - descontos (valor para o organizador)
     const totalLiquido = totalValorUnitario - totalDesconto;
     const totalPago = totalValorUnitario - totalDesconto + totalTaxa;
 
-    // Linha de totais
     const totalsRow = [
       "TOTAIS (Confirmadas)",
       "",
@@ -376,6 +391,7 @@ export default function OrganizerEventInscritosPage() {
       "",
       "",
       "",
+      ...eligibilityKeys.map(() => ""),
     ];
 
     return { headers, rows: [...rows, totalsRow] };

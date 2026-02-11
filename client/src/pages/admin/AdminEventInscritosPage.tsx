@@ -112,6 +112,7 @@ interface EnrichedRegistration {
   orderId: string;
   numeroPedido: number | null;
   orderRegistrationsCount: number;
+  dadosElegibilidade: Record<string, any> | null;
 }
 
 interface StatusChangeLog {
@@ -396,6 +397,19 @@ export default function AdminEventInscritosPage() {
   };
 
   const getExportData = () => {
+    const eligibilityKeys: string[] = [];
+    const seenKeys = new Set<string>();
+    filteredRegistrations.forEach((reg) => {
+      if (reg.dadosElegibilidade && typeof reg.dadosElegibilidade === 'object') {
+        Object.keys(reg.dadosElegibilidade).forEach((key) => {
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            eligibilityKeys.push(key);
+          }
+        });
+      }
+    });
+
     const headers = [
       "Nº Inscrição",
       "Nº Pedido",
@@ -420,21 +434,25 @@ export default function AdminEventInscritosPage() {
       "Status Pedido",
       "Data Inscrição",
       "Data Pagamento",
+      ...eligibilityKeys.map(k => `Elegibilidade: ${k}`),
     ];
 
     const rows = filteredRegistrations.map((reg) => {
       const valorUnitario = parseFloat(reg.valorUnitario);
       const taxaComodidade = parseFloat(reg.taxaComodidade);
       const valorDesconto = parseFloat(reg.valorDesconto) / (reg.orderRegistrationsCount || 1);
-      // Valor bruto = valor unitário + taxa (total arrecadado)
       const valorBruto = valorUnitario + taxaComodidade;
-      // Valor líquido = valor unitário - desconto (valor para o organizador)
       const valorLiquido = valorUnitario - valorDesconto;
       const totalPago = valorUnitario - valorDesconto + taxaComodidade;
       const isGratuito = totalPago === 0;
       const formaPagamento = isGratuito ? "Cortesia" : (metodoPagamentoLabels[reg.metodoPagamento || ""] || reg.metodoPagamento || "");
       const codigoDesconto = reg.codigoCupom || reg.codigoVoucher || "";
       
+      const eligibilityValues = eligibilityKeys.map(key => {
+        const val = reg.dadosElegibilidade?.[key];
+        return val != null ? String(val) : "";
+      });
+
       return [
         reg.numeroInscricao,
         reg.numeroPedido || "",
@@ -459,6 +477,7 @@ export default function AdminEventInscritosPage() {
         orderStatusLabels[reg.orderStatus] || reg.orderStatus,
         formatDateOnlyBrazil(reg.dataInscricao),
         reg.dataPagamento ? formatDateTimeBrazil(reg.dataPagamento) : "",
+        ...eligibilityValues,
       ];
     });
 
@@ -473,7 +492,6 @@ export default function AdminEventInscritosPage() {
     const totalLiquido = totalValorUnitario - totalDesconto;
     const totalPago = totalValorUnitario - totalDesconto + totalTaxa;
 
-    // Linha de totais
     const totalsRow = [
       "TOTAIS (Confirmadas)",
       "",
@@ -498,6 +516,7 @@ export default function AdminEventInscritosPage() {
       "",
       "",
       "",
+      ...eligibilityKeys.map(() => ""),
     ];
 
     return { headers, rows: [...rows, totalsRow] };
@@ -973,6 +992,23 @@ export default function AdminEventInscritosPage() {
                       </div>
                     </div>
                   </div>
+
+                  {selectedRegistration.dadosElegibilidade && Object.keys(selectedRegistration.dadosElegibilidade).length > 0 && (
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <Layers className="h-4 w-4" />
+                        Dados de Elegibilidade
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {Object.entries(selectedRegistration.dadosElegibilidade).map(([key, value]) => (
+                          <div key={key} className="space-y-1">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide">{key}</p>
+                            <p>{String(value)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="border-t pt-4">
                     <h4 className="font-medium mb-3 flex items-center gap-2">
