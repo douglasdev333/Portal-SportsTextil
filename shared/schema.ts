@@ -42,6 +42,7 @@ export interface EligibilityRule {
   validation: EligibilityRuleValidation;
   on_error: "block" | "allow";
   error_message: string;
+  save_fields?: string[];
 }
 
 export const organizers = pgTable("organizers", {
@@ -237,6 +238,7 @@ export const registrations = pgTable("registrations", {
   cpf: varchar("cpf", { length: 14 }),
   dataNascimento: date("data_nascimento"),
   sexo: varchar("sexo", { length: 20 }),
+  dadosElegibilidade: jsonb("dados_elegibilidade"),
   dataInscricao: timestamp("data_inscricao", { withTimezone: true }).defaultNow().notNull(),
 });
 

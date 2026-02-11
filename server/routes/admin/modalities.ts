@@ -50,6 +50,7 @@ const modalitySchema = z.object({
     }),
     on_error: z.enum(["block", "allow"]),
     error_message: z.string(),
+    save_fields: z.array(z.string()).optional(),
   })).optional().nullable(),
   ordem: z.number().int().optional(),
   ativo: z.boolean().optional()

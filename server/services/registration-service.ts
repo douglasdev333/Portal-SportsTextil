@@ -18,6 +18,7 @@ export interface RegistrationData {
   cpf: string;
   dataNascimento: string;
   sexo: string;
+  dadosElegibilidade?: Record<string, any> | null;
 }
 
 export interface OrderData {
@@ -432,9 +433,9 @@ export async function registerForEventAtomic(
       `INSERT INTO registrations (
         id, numero_inscricao, order_id, event_id, modality_id, batch_id,
         athlete_id, tamanho_camisa, valor_unitario, taxa_comodidade,
-        status, equipe, nome_completo, cpf, data_nascimento, sexo
+        status, equipe, nome_completo, cpf, data_nascimento, sexo, dados_elegibilidade
       ) VALUES (
-        gen_random_uuid(), nextval('registration_number_seq'), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+        gen_random_uuid(), nextval('registration_number_seq'), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
       ) RETURNING id, numero_inscricao, status`,
       [
         order.id,
@@ -450,7 +451,8 @@ export async function registerForEventAtomic(
         registrationData.nomeCompleto,
         registrationData.cpf,
         registrationData.dataNascimento,
-        registrationData.sexo
+        registrationData.sexo,
+        registrationData.dadosElegibilidade ? JSON.stringify(registrationData.dadosElegibilidade) : null
       ]
     );
     

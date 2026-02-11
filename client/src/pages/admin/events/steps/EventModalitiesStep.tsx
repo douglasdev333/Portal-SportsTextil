@@ -69,6 +69,7 @@ const defaultEligibilityRule = {
   },
   on_error: "block" as const,
   error_message: "",
+  save_fields: [] as string[],
 };
 
 export function EventModalitiesStep({ formData, updateFormData }: EventModalitiesStepProps) {
@@ -793,6 +794,26 @@ export function EventModalitiesStep({ formData, updateFormData }: EventModalitie
                           </Select>
                           <p className="text-xs text-muted-foreground">
                             Define o comportamento quando a API externa está fora do ar
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="eligibility-save-fields">Campos para salvar na inscrição</Label>
+                          <Input
+                            id="eligibility-save-fields"
+                            value={(rule.save_fields || []).join(", ")}
+                            onChange={(e) => {
+                              const fields = e.target.value
+                                .split(",")
+                                .map(s => s.trim())
+                                .filter(s => s.length > 0);
+                              updateRule({ save_fields: fields });
+                            }}
+                            placeholder="Ex: categoria, observacao"
+                            data-testid="input-eligibility-save-fields"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Nomes dos campos do JSON da API que serão salvos na inscrição. Separe com vírgula.
                           </p>
                         </div>
 

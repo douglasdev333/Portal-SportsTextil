@@ -478,6 +478,8 @@ router.post("/", async (req, res) => {
       }
     }
 
+    let dadosElegibilidade: Record<string, any> | null = null;
+
     if (modality.regrasElegibilidade && Array.isArray(modality.regrasElegibilidade) && modality.regrasElegibilidade.length > 0) {
       const eligibilityResult = await executeEligibilityCheck(
         {
@@ -497,6 +499,11 @@ router.post("/", async (req, res) => {
           errorCode: "ELIGIBILITY_CHECK_FAILED",
           details: { messages: eligibilityResult.messages }
         });
+      }
+
+      if (eligibilityResult.extractedData) {
+        dadosElegibilidade = eligibilityResult.extractedData;
+        console.log(`[registrations] Dados extraídos da API de elegibilidade:`, JSON.stringify(dadosElegibilidade));
       }
     }
 
@@ -593,7 +600,8 @@ router.post("/", async (req, res) => {
         nomeCompleto: athlete.nome,
         cpf: athlete.cpf,
         dataNascimento: athlete.dataNascimento,
-        sexo: athlete.sexo
+        sexo: athlete.sexo,
+        dadosElegibilidade
       }
     );
 
