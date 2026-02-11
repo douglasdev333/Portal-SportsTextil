@@ -33,6 +33,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import * as XLSX from "xlsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Search, 
   Download,
@@ -45,9 +46,18 @@ import {
   ChevronRight,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  User,
+  Hash,
+  Calendar,
+  Phone,
+  Mail,
+  Shirt,
+  Layers,
+  ShoppingCart,
+  History,
 } from "lucide-react";
-import { formatDateOnlyBrazil } from "@/lib/timezone";
+import { formatDateOnlyBrazil, formatDateTimeBrazil } from "@/lib/timezone";
 import { useOrganizerAuth } from "@/contexts/OrganizerAuthContext";
 
 interface EnrichedRegistration {
@@ -177,6 +187,7 @@ export default function OrganizerEventInscritosPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortColumn, setSortColumn] = useState<string>("numeroInscricao");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedRegistration, setSelectedRegistration] = useState<EnrichedRegistration | null>(null);
 
   const { data: eventsData, isLoading: eventsLoading } = useQuery<{ success: boolean; data: Event[] }>({
     queryKey: ["/api/admin/events"],
@@ -568,7 +579,7 @@ export default function OrganizerEventInscritosPage() {
                   </TableHeader>
                   <TableBody>
                     {paginatedRegistrations.map((reg) => (
-                      <TableRow key={reg.id}>
+                      <TableRow key={reg.id} className="cursor-pointer" onClick={() => setSelectedRegistration(reg)}>
                         <TableCell className="font-mono text-sm">
                           {reg.numeroInscricao}
                         </TableCell>
@@ -649,6 +660,173 @@ export default function OrganizerEventInscritosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!selectedRegistration} onOpenChange={(open) => !open && setSelectedRegistration(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Detalhes da Inscrição
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedRegistration && (
+            <div className="flex-1 overflow-auto space-y-6 py-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">
+                    {selectedRegistration.nomeCompleto || selectedRegistration.athleteName}
+                  </h3>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Hash className="h-3 w-3" />
+                    Inscrição #{selectedRegistration.numeroInscricao}
+                  </p>
+                </div>
+                <StatusIcon status={selectedRegistration.status} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">CPF</p>
+                  <p className="font-mono">{formatCPF(selectedRegistration.cpf)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Data de Nascimento</p>
+                  <p className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                    {selectedRegistration.dataNascimento 
+                      ? formatDateOnlyBrazil(selectedRegistration.dataNascimento) 
+                      : "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Telefone</p>
+                  <p className="flex items-center gap-1">
+                    <Phone className="h-3 w-3 text-muted-foreground" />
+                    {selectedRegistration.athletePhone || "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
+                  <p className="flex items-center gap-1 text-sm truncate">
+                    <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    {selectedRegistration.athleteEmail || "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Sexo</p>
+                  <p className="capitalize">{selectedRegistration.sexo || "-"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Camisa</p>
+                  <p className="flex items-center gap-1">
+                    <Shirt className="h-3 w-3 text-muted-foreground" />
+                    {selectedRegistration.tamanhoCamisa || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  Informações da Inscrição
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Modalidade</p>
+                    <Badge variant="outline">{selectedRegistration.modalityName}</Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Lote</p>
+                    <p className="flex items-center gap-1">
+                      <Layers className="h-3 w-3 text-muted-foreground" />
+                      {selectedRegistration.batchName}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Valor da Inscrição</p>
+                    <p className="font-semibold">{formatCurrency(selectedRegistration.valorUnitario)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Taxa de Serviço</p>
+                    <p>{formatCurrency(selectedRegistration.taxaComodidade)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Data da Inscrição</p>
+                    <p>{formatDateTimeBrazil(selectedRegistration.dataInscricao)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Equipe</p>
+                    <p>{selectedRegistration.equipe || "-"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedRegistration.dadosElegibilidade && Object.keys(selectedRegistration.dadosElegibilidade).length > 0 && (
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3 flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Dados de Elegibilidade
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries(selectedRegistration.dadosElegibilidade).map(([key, value]) => (
+                      <div key={key} className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">{key}</p>
+                        <p>{String(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Pedido
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Número do Pedido</p>
+                    <p className="font-mono font-semibold">#{selectedRegistration.numeroPedido || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Inscrições no Pedido</p>
+                    <p>{selectedRegistration.orderRegistrationsCount}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Status do Pedido</p>
+                    <Badge 
+                      variant={selectedRegistration.orderStatus === "pago" ? "default" : "secondary"}
+                    >
+                      {orderStatusLabels[selectedRegistration.orderStatus] || selectedRegistration.orderStatus}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Forma de Pagamento</p>
+                    <p>
+                      {selectedRegistration.metodoPagamento 
+                        ? metodoPagamentoLabels[selectedRegistration.metodoPagamento] || selectedRegistration.metodoPagamento
+                        : "-"}
+                    </p>
+                  </div>
+                  {selectedRegistration.dataPagamento && (
+                    <div className="space-y-1 col-span-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Data do Pagamento</p>
+                      <p>{formatDateTimeBrazil(selectedRegistration.dataPagamento)}</p>
+                    </div>
+                  )}
+                  {parseFloat(selectedRegistration.valorDesconto) > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Desconto</p>
+                      <p className="text-green-600">{formatCurrency(selectedRegistration.valorDesconto)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
         <DialogContent>
