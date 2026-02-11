@@ -4,6 +4,10 @@ import { ptBR } from 'date-fns/locale';
 
 export const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
 
+function isUTCString(dateString: string): boolean {
+  return /Z$/.test(dateString) || /[+-]\d{2}:\d{2}$/.test(dateString);
+}
+
 function parseLocalDateTimeString(dateString: string): Date | null {
   const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/);
   if (!match) return null;
@@ -30,6 +34,11 @@ export function formatDateTimeBrazil(dateString: string | Date | null | undefine
   if (!dateString) return '';
   
   if (typeof dateString === 'string') {
+    if (isUTCString(dateString)) {
+      const utcDate = new Date(dateString);
+      if (!isValid(utcDate)) return '';
+      return formatInTimeZone(utcDate, BRAZIL_TIMEZONE, 'dd/MM/yyyy HH:mm', { locale: ptBR });
+    }
     const localDate = parseLocalDateTimeString(dateString);
     if (!localDate) return '';
     return format(localDate, 'dd/MM/yyyy HH:mm', { locale: ptBR });
@@ -84,6 +93,11 @@ export function formatTimeBrazil(dateString: string | Date | null | undefined): 
   if (!dateString) return '';
   
   if (typeof dateString === 'string') {
+    if (isUTCString(dateString)) {
+      const utcDate = new Date(dateString);
+      if (!isValid(utcDate)) return '';
+      return formatInTimeZone(utcDate, BRAZIL_TIMEZONE, 'HH:mm', { locale: ptBR });
+    }
     const localDate = parseLocalDateTimeString(dateString);
     if (!localDate) return '';
     return format(localDate, 'HH:mm', { locale: ptBR });
@@ -97,6 +111,11 @@ export function formatTimestampAsDateBrazil(dateString: string | Date | null | u
   if (!dateString) return '';
   
   if (typeof dateString === 'string') {
+    if (isUTCString(dateString)) {
+      const utcDate = new Date(dateString);
+      if (!isValid(utcDate)) return '';
+      return formatInTimeZone(utcDate, BRAZIL_TIMEZONE, 'dd/MM/yyyy', { locale: ptBR });
+    }
     const localDate = parseLocalDateTimeString(dateString);
     if (!localDate) return '';
     return format(localDate, 'dd/MM/yyyy', { locale: ptBR });
@@ -110,6 +129,11 @@ export function formatForInput(dateString: string | Date | null | undefined): st
   if (!dateString) return '';
   
   if (typeof dateString === 'string') {
+    if (isUTCString(dateString)) {
+      const utcDate = new Date(dateString);
+      if (!isValid(utcDate)) return '';
+      return formatInTimeZone(utcDate, BRAZIL_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
+    }
     const localDate = parseLocalDateTimeString(dateString);
     if (!localDate) return '';
     return format(localDate, "yyyy-MM-dd'T'HH:mm");
@@ -223,9 +247,14 @@ export function formatRelativeDate(dateString: string | Date | null | undefined)
   let targetDate: Date | null;
   
   if (typeof dateString === 'string') {
-    const localDate = parseLocalDateTimeString(dateString);
-    if (!localDate) return '';
-    targetDate = fromZonedTime(localDate, BRAZIL_TIMEZONE);
+    if (isUTCString(dateString)) {
+      targetDate = new Date(dateString);
+      if (!isValid(targetDate)) return '';
+    } else {
+      const localDate = parseLocalDateTimeString(dateString);
+      if (!localDate) return '';
+      targetDate = fromZonedTime(localDate, BRAZIL_TIMEZONE);
+    }
   } else {
     if (!isValid(dateString)) return '';
     targetDate = dateString;
