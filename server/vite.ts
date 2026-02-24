@@ -70,7 +70,7 @@ async function injectOpenGraphMeta(html: string, url: string, host: string): Pro
     <meta property="og:image" content="${imageUrl}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:site_name" content="KitRunner" />
+    <meta property="og:site_name" content="Sports&Textil" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${description}" />
@@ -84,14 +84,14 @@ async function injectOpenGraphMeta(html: string, url: string, host: string): Pro
     ogTags = `
     <meta property="og:type" content="website" />
     <meta property="og:url" content="${baseUrl}${url}" />
-    <meta property="og:title" content="KitRunner - Portal de Inscrições" />
+    <meta property="og:title" content="Sports&Textil - Portal de Inscrições" />
     <meta property="og:description" content="Inscreva-se nas melhores corridas e eventos esportivos do Brasil. Portal para maratonas, corridas de rua, trail running e muito mais." />
     <meta property="og:image" content="${defaultImage}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:site_name" content="KitRunner" />
+    <meta property="og:site_name" content="Sports&Textil" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="KitRunner - Portal de Inscrições" />
+    <meta name="twitter:title" content="Sports&Textil - Portal de Inscrições" />
     <meta name="twitter:description" content="Inscreva-se nas melhores corridas e eventos esportivos do Brasil. Portal para maratonas, corridas de rua, trail running e muito mais." />
     <meta name="twitter:image" content="${defaultImage}" />`;
   }

@@ -77,7 +77,7 @@ export async function createPixPayment(
         transaction_amount: amount,
         description: description,
         payment_method_id: 'pix',
-        statement_descriptor: "KITRUNNER",
+        statement_descriptor: "SPORTSTEXTIL",
         payer: {
           email: buyerEmail,
           first_name: firstName || undefined,
@@ -205,7 +205,7 @@ export async function createCardPayment(
       description: description || `Pagamento pedido ${orderId}`,
       installments: installments,
       payment_method_id: paymentMethodId,
-      statement_descriptor: "KITRUNNER",
+      statement_descriptor: "SPORTSTEXTIL",
       binary_mode: false,
       payer: {
         email: buyerEmail,

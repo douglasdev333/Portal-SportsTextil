@@ -50,7 +50,7 @@ export function OrganizerSidebar() {
             <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">KitRunner</span>
+            <span className="text-sm font-semibold">Sports&Textil</span>
             <span className="text-xs text-muted-foreground">Portal Organizador</span>
           </div>
         </div>

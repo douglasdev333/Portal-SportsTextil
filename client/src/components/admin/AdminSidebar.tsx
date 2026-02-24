@@ -78,7 +78,7 @@ export function AdminSidebar() {
             <Shield className="h-4 w-4 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">KitRunner</span>
+            <span className="text-sm font-semibold">Sports&Textil</span>
             <span className="text-xs text-muted-foreground">Painel Admin</span>
           </div>
         </div>

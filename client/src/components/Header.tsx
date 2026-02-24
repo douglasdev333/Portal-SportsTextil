@@ -37,7 +37,7 @@ export default function Header() {
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity rounded-md px-3 py-2">
             <img 
               src="/assets/logo.png" 
-              alt="KitRunner" 
+              alt="Sports&Textil" 
               className="h-8 md:h-10 w-auto"
             />
           </Link>

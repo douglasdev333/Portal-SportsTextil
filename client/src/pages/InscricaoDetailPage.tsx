@@ -311,7 +311,7 @@ export default function InscricaoDetailPage() {
                     })}
                     size={180}
                     level="M"
-                    fgColor="#6D28D9"
+                    fgColor="#0c3367"
                   />
                 </div>
                 <p className="text-sm text-muted-foreground mt-3 text-center">

@@ -10,7 +10,7 @@ export default function Footer() {
         <div className="flex flex-col items-center gap-4">
           <img 
             src="/assets/logo.png" 
-            alt="KitRunner" 
+            alt="Sports&Textil" 
             className="h-8 w-auto"
           />
           <div className="flex gap-6">
@@ -34,7 +34,7 @@ export default function Footer() {
             </a>
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            {currentYear} KitRunner · CNPJ: 55.108.434/0001-00
+            {currentYear} Sports&Textil · CNPJ: 55.108.434/0001-00
           </p>
         </div>
       </div>
@@ -44,7 +44,7 @@ export default function Footer() {
           <div>
             <img 
               src="/assets/logo.png" 
-              alt="KitRunner" 
+              alt="Sports&Textil" 
               className="h-10 w-auto mb-4"
             />
             <p className="text-muted-foreground text-sm leading-relaxed">
@@ -79,7 +79,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <a 
-                  href="https://wa.me/5583981302961?text=Olá! Gostaria de cadastrar meu evento no KitRunner." 
+                  href="https://wa.me/5583981302961?text=Olá! Gostaria de cadastrar meu evento no Sports&Textil." 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-primary text-sm transition-colors"
@@ -95,7 +95,7 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 text-primary" />
-                <span>contato@kitrunner.com.br</span>
+                <span>contato@sportstextil.com.br</span>
               </li>
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Phone className="h-4 w-4 text-primary" />
@@ -131,7 +131,7 @@ export default function Footer() {
 
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            {currentYear} KitRunner. Todos os direitos reservados. · CNPJ: 55.108.434/0001-00
+            {currentYear} Sports&Textil. Todos os direitos reservados. · CNPJ: 55.108.434/0001-00
           </p>
         </div>
       </div>

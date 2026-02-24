@@ -6,8 +6,8 @@ import { storage } from "../storage";
 const router = Router();
 
 const BRAND_COLORS = {
-  primary: "#6D28D9",
-  accent: "#8B5CF6",
+  primary: "#0c3367",
+  accent: "#1a4a8a",
   text: "#333333",
   textLight: "#666666",
   border: "#e2e8f0",
@@ -114,7 +114,7 @@ router.get("/:registrationId", async (req, res) => {
       margin: 50,
       info: {
         Title: `Comprovante de Inscrição - ${event.nome}`,
-        Author: "KitRunner - Inscrições",
+        Author: "Sports&Textil - Inscrições",
         Subject: `Inscrição #${registration.numeroInscricao}`,
       },
     });
@@ -134,7 +134,7 @@ router.get("/:registrationId", async (req, res) => {
       .fontSize(24)
       .font("Helvetica-Bold")
       .fillColor("#ffffff")
-      .text("KITRUNNER", 50, 20);
+      .text("SPORTS&TEXTIL", 50, 20);
 
     doc
       .fontSize(10)
@@ -335,7 +335,7 @@ router.get("/:registrationId", async (req, res) => {
       .font("Helvetica")
       .fillColor(BRAND_COLORS.textLight)
       .text(
-        "Este documento é um comprovante de inscrição gerado eletronicamente pelo sistema KitRunner.",
+        "Este documento é um comprovante de inscrição gerado eletronicamente pelo sistema Sports&Textil.",
         50, qrBoxY + 160, { align: "center", width: 495 },
       )
       .text(`Documento gerado em: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
