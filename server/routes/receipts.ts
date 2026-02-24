@@ -7,10 +7,12 @@ const router = Router();
 
 const BRAND_COLORS = {
   primary: "#0c3367",
+  secondary: "#d0bf6d",
   accent: "#1a4a8a",
-  text: "#333333",
-  textLight: "#666666",
-  border: "#e2e8f0",
+  text: "#1a1a2e",
+  textLight: "#555555",
+  border: "#d0bf6d",
+  sectionBg: "#f5f3eb",
   success: "#22c55e",
 };
 
@@ -127,45 +129,51 @@ router.get("/:registrationId", async (req, res) => {
 
     doc.pipe(res);
 
-    doc.rect(0, 0, 595, 70).fill(BRAND_COLORS.primary);
+    doc.rect(0, 0, 595, 80).fill(BRAND_COLORS.primary);
+
+    doc.rect(0, 80, 595, 5).fill(BRAND_COLORS.secondary);
 
     doc.save();
     doc
-      .fontSize(24)
+      .fontSize(26)
       .font("Helvetica-Bold")
       .fillColor("#ffffff")
-      .text("SPORTS&TEXTIL", 50, 20);
+      .text("SPORTS&TEXTIL", 50, 18);
 
     doc
       .fontSize(10)
       .font("Helvetica")
-      .fillColor("#ffffff")
-      .text("Comprovante de Inscrição", 50, 48);
+      .fillColor(BRAND_COLORS.secondary)
+      .text("Comprovante de Inscrição", 50, 50);
     doc.restore();
 
     doc
-      .rect(50, 80, 495, 40)
-      .fill(BRAND_COLORS.accent);
+      .rect(50, 95, 495, 42)
+      .fill(BRAND_COLORS.primary);
+
+    doc
+      .rect(50, 95, 4, 42)
+      .fill(BRAND_COLORS.secondary);
 
     doc
       .fontSize(9)
       .font("Helvetica-Bold")
+      .fillColor(BRAND_COLORS.secondary)
+      .text("INSCRIÇÃO CONFIRMADA", 64, 101);
+
+    doc
+      .fontSize(16)
+      .font("Helvetica-Bold")
       .fillColor("#ffffff")
-      .text("INSCRIÇÃO CONFIRMADA", 60, 88);
+      .text(`#${registration.numeroInscricao}`, 64, 116);
+
+    const qrCodeBuffer = Buffer.from(qrCodeDataUrl.split(",")[1], "base64");
+    doc.image(qrCodeBuffer, 500, 99, { width: 35, height: 35 });
+
+    doc.y = 148;
 
     doc
       .fontSize(14)
-      .font("Helvetica-Bold")
-      .fillColor("#ffffff")
-      .text(`#${registration.numeroInscricao}`, 60, 102);
-
-    const qrCodeBuffer = Buffer.from(qrCodeDataUrl.split(",")[1], "base64");
-    doc.image(qrCodeBuffer, 500, 82, { width: 35, height: 35 });
-
-    doc.y = 130;
-
-    doc
-      .fontSize(13)
       .font("Helvetica-Bold")
       .fillColor(BRAND_COLORS.primary)
       .text(event.nome, 50, doc.y);
@@ -181,33 +189,37 @@ router.get("/:registrationId", async (req, res) => {
 
     const drawSectionHeader = (title: string) => {
       doc
-        .rect(50, doc.y, 495, 18)
-        .fill("#f8fafc");
+        .rect(50, doc.y, 495, 20)
+        .fill(BRAND_COLORS.sectionBg);
+
+      doc
+        .rect(50, doc.y, 3, 20)
+        .fill(BRAND_COLORS.secondary);
 
       doc
         .fontSize(9)
         .font("Helvetica-Bold")
         .fillColor(BRAND_COLORS.primary)
-        .text(title, 55, doc.y + 5);
+        .text(title, 60, doc.y + 6);
 
-      doc.y += 22;
+      doc.y += 24;
     };
 
     const drawDataRow = (label: string, value: string, isHighlighted = false) => {
-      const rowHeight = 14;
+      const rowHeight = 15;
       const startY = doc.y;
 
       doc
         .fontSize(9)
         .font("Helvetica")
         .fillColor(BRAND_COLORS.textLight)
-        .text(label, 55, startY);
+        .text(label, 60, startY);
 
       doc
         .fontSize(9)
         .font(isHighlighted ? "Helvetica-Bold" : "Helvetica")
         .fillColor(isHighlighted ? BRAND_COLORS.primary : BRAND_COLORS.text)
-        .text(value, 180, startY);
+        .text(value, 185, startY);
 
       doc.y = startY + rowHeight;
     };
@@ -308,38 +320,59 @@ router.get("/:registrationId", async (req, res) => {
     doc.moveDown(0.5);
 
     const qrBoxY = doc.y;
+
     doc
       .rect(50, qrBoxY, 495, 155)
-      .lineWidth(1)
-      .strokeColor(BRAND_COLORS.border)
+      .fill("#faf9f5");
+
+    doc
+      .rect(50, qrBoxY, 495, 155)
+      .lineWidth(1.5)
+      .strokeColor(BRAND_COLORS.secondary)
       .stroke();
 
     const qrCodeLargeBuffer = Buffer.from(qrCodeDataUrl.split(",")[1], "base64");
-    doc.image(qrCodeLargeBuffer, 58, qrBoxY + 8, { width: 140, height: 140 });
+    doc.image(qrCodeLargeBuffer, 62, qrBoxY + 8, { width: 140, height: 140 });
 
     doc
-      .fontSize(11)
+      .fontSize(12)
       .font("Helvetica-Bold")
       .fillColor(BRAND_COLORS.primary)
-      .text("QR Code de Verificação", 215, qrBoxY + 50);
+      .text("QR Code de Verificação", 220, qrBoxY + 45);
+
+    doc
+      .rect(220, qrBoxY + 62, 40, 2)
+      .fill(BRAND_COLORS.secondary);
 
     doc
       .fontSize(9)
       .font("Helvetica")
       .fillColor(BRAND_COLORS.textLight)
-      .text("Apresente este QR code no dia do evento", 215, qrBoxY + 70)
-      .text("para agilizar sua identificação.", 215, qrBoxY + 82);
+      .text("Apresente este QR code no dia do evento", 220, qrBoxY + 72)
+      .text("para agilizar sua identificação.", 220, qrBoxY + 84);
+
+    doc.moveDown(1);
+
+    const footerY = qrBoxY + 165;
+
+    doc
+      .rect(0, footerY, 595, 30)
+      .fill(BRAND_COLORS.primary);
+
+    doc
+      .rect(0, footerY, 595, 2)
+      .fill(BRAND_COLORS.secondary);
 
     doc
       .fontSize(7)
       .font("Helvetica")
-      .fillColor(BRAND_COLORS.textLight)
+      .fillColor("#ffffff")
       .text(
         "Este documento é um comprovante de inscrição gerado eletronicamente pelo sistema Sports&Textil.",
-        50, qrBoxY + 160, { align: "center", width: 495 },
+        50, footerY + 8, { align: "center", width: 495 },
       )
       .text(`Documento gerado em: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
-        50, qrBoxY + 170, { align: "center", width: 495 },
+        50, footerY + 18, { align: "center", width: 495 },
       );
 
     doc.end();
