@@ -162,7 +162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...mod,
           linksPercurso,
           isAvailable: availInfo?.isAvailable ?? true,
-          isSoldOut: availInfo?.isSoldOut ?? false
+          isSoldOut: availInfo?.isSoldOut ?? false,
+          hasFutureBatches: availInfo?.hasFutureBatches ?? false
         };
       });
 
@@ -185,8 +186,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         registrationStatus = 'closed';
         registrationMessage = 'Inscrições encerradas';
       } else if (currentEvent.status === 'esgotado' || modalitiesAvailability?.eventSoldOut) {
-        registrationStatus = 'sold_out';
-        registrationMessage = 'Evento esgotado - todas as vagas foram preenchidas';
+        if (modalitiesAvailability?.eventHasFutureBatches) {
+          registrationStatus = 'not_started';
+          registrationMessage = 'Novo lote em breve';
+        } else {
+          registrationStatus = 'sold_out';
+          registrationMessage = 'Evento esgotado - todas as vagas foram preenchidas';
+        }
       }
 
       // Get banner URL from event or from banners table

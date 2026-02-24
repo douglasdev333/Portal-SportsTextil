@@ -187,6 +187,7 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 interface ModalityWithAvailability extends Modality {
   isAvailable?: boolean;
   isSoldOut?: boolean;
+  hasFutureBatches?: boolean;
 }
 
 interface EventWithDetails extends Event {
@@ -685,19 +686,26 @@ export default function EventoDetailPage() {
                     {modalities.map((mod) => {
                       const isSoldOut = eventSoldOut || mod.isSoldOut;
                       const showAsComingSoon = registrationStatus === 'not_started';
+                      const showAsComingSoonBatch = isSoldOut && mod.hasFutureBatches && !showAsComingSoon;
+                      const showSoldOut = isSoldOut && !showAsComingSoon && !showAsComingSoonBatch;
                       return (
                         <div 
                           key={mod.id} 
-                          className={`p-3 md:p-4 border rounded-lg ${isSoldOut && !showAsComingSoon ? 'opacity-60 bg-muted/30' : ''}`}
+                          className={`p-3 md:p-4 border rounded-lg ${showSoldOut ? 'opacity-60 bg-muted/30' : ''}`}
                           data-testid={`modality-item-${mod.id}`}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-3">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-semibold text-sm md:text-lg">{mod.nome}</h3>
-                                {isSoldOut && !showAsComingSoon && (
+                                {showSoldOut && (
                                   <Badge variant="destructive" className="text-xs">
                                     Esgotado
+                                  </Badge>
+                                )}
+                                {(showAsComingSoon || showAsComingSoonBatch) && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Em breve
                                   </Badge>
                                 )}
                               </div>
@@ -716,9 +724,11 @@ export default function EventoDetailPage() {
                               )}
                             </div>
                             <div className="text-right">
-                              {!isSoldOut && (
+                              {showAsComingSoon || showAsComingSoonBatch ? (
+                                <span className="font-semibold text-sm text-muted-foreground">Em breve</span>
+                              ) : !isSoldOut ? (
                                 <span className="text-lg md:text-xl font-bold text-primary">{getPrice(mod.id)}</span>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -948,20 +958,22 @@ export default function EventoDetailPage() {
                         {modalities.map((mod) => {
                           const isSoldOut = eventSoldOut || mod.isSoldOut;
                           const showAsComingSoon = registrationStatus === 'not_started';
+                          const showAsComingSoonBatch = isSoldOut && mod.hasFutureBatches && !showAsComingSoon;
+                          const showSoldOut = isSoldOut && !showAsComingSoon && !showAsComingSoonBatch;
                           return (
                             <div 
                               key={mod.id} 
-                              className={`flex items-center justify-between py-2 ${isSoldOut && !showAsComingSoon ? 'opacity-60' : ''}`}
+                              className={`flex items-center justify-between py-2 ${showSoldOut ? 'opacity-60' : ''}`}
                             >
                               <div className="flex items-center gap-2">
                                 <span className="text-sm">{mod.distancia} {mod.unidadeDistancia}</span>
                                 <span className="text-xs text-muted-foreground">- {mod.nome}</span>
                               </div>
-                              {isSoldOut && !showAsComingSoon ? (
+                              {showSoldOut ? (
                                 <Badge variant="destructive" className="text-xs">
                                   Esgotado
                                 </Badge>
-                              ) : showAsComingSoon ? (
+                              ) : showAsComingSoon || showAsComingSoonBatch ? (
                                 <span className="font-semibold text-sm text-muted-foreground">Em breve</span>
                               ) : (
                                 <span className="font-semibold text-sm">{getPrice(mod.id)}</span>

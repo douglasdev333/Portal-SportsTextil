@@ -19,6 +19,7 @@ export interface ModalityAvailability {
   vagasOcupadas: number;
   isAvailable: boolean;
   isSoldOut: boolean;
+  hasFutureBatches: boolean;
   activeBatchId: string | null;
   activeBatchPrice: string | null;
 }
@@ -302,6 +303,7 @@ export async function recalculateBatchesForEvent(eventId: string): Promise<Batch
 export async function getModalitiesAvailability(eventId: string): Promise<{
   eventStatus: string;
   eventSoldOut: boolean;
+  eventHasFutureBatches: boolean;
   modalities: ModalityAvailability[];
 }> {
   const client = await pool.connect();
@@ -323,6 +325,14 @@ export async function getModalitiesAvailability(eventId: string): Promise<{
     const event = eventResult.rows[0];
     const eventSoldOut = event.status === 'esgotado' || event.vagas_ocupadas >= event.limite_vagas_total;
     
+    // Check if event has future batches
+    const futureBatchesResult = await client.query(
+      `SELECT COUNT(*) as count FROM registration_batches
+       WHERE event_id = $1 AND status = 'future'`,
+      [eventId]
+    );
+    const eventHasFutureBatches = parseInt(futureBatchesResult.rows[0].count) > 0;
+
     // Get all modalities with their availability
     const modalitiesResult = await client.query(
       `SELECT 
@@ -355,6 +365,7 @@ export async function getModalitiesAvailability(eventId: string): Promise<{
           vagasOcupadas: m.vagas_ocupadas,
           isAvailable: false,
           isSoldOut: true,
+          hasFutureBatches: eventHasFutureBatches,
           activeBatchId: null,
           activeBatchPrice: null
         };
@@ -381,14 +392,19 @@ export async function getModalitiesAvailability(eventId: string): Promise<{
         vagasOcupadas: m.vagas_ocupadas,
         isAvailable,
         isSoldOut,
+        hasFutureBatches: isSoldOut && !modalityFull ? eventHasFutureBatches : false,
         activeBatchId: hasValidBatch ? m.active_batch_id : null,
         activeBatchPrice: m.batch_price
       };
     });
     
+    const anyModalityHasFutureBatches = modalities.some(m => m.hasFutureBatches);
+    const allModalitiesSoldOut = modalities.length > 0 && modalities.every(m => m.isSoldOut);
+    
     return {
       eventStatus: event.status,
       eventSoldOut,
+      eventHasFutureBatches: (eventSoldOut || allModalitiesSoldOut) && anyModalityHasFutureBatches,
       modalities
     };
     
